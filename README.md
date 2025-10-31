@@ -75,7 +75,7 @@
 
 # WebGame-of-StarRail 🎮
 
-Web-based Honkai: Star Rail fan game project, welcome all developers to join the development!
+Web-based Honkai: Star Rail Word fan game project, welcome all developers to join the development!
 
 ### Project Introduction
 
