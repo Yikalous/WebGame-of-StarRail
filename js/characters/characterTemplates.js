@@ -61,9 +61,9 @@ const FangsuanTemplate = {
 };
 
 const AntimatterLegionTemplate = {
-    name: "反物质军团",
+    name: "正物质军团",
     type: "enemy",
-    maxHp: 40000000,
+    maxHp: 4000000,
     attack: 250,
     critRate: 0.2,
     critDamage: 0.5,
@@ -100,7 +100,7 @@ const AntimatterLegionTemplate = {
 };
 
 const TrailblazerTemplate = {
-    name: "开拓者",
+    name: "紧缩者",
     type: "ally",
     maxHp: 3500,
     attack: 2800,
@@ -161,7 +161,7 @@ const TrailblazerTemplate = {
 };
 
 const SilverWolfTemplate = {
-    name: "银狼",
+    name: "金狼",
     type: "ally",
     maxHp: 3200,
     attack: 3000,
