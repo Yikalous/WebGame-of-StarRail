@@ -65,22 +65,36 @@
     </div>
 
     <!-- 一次性加载所有JS文件 -->
+    <!-- ===== 游戏核心系统 ===== -->
     <script src="js/game/Skill.js"></script>
     <script src="js/game/StatusEffect.js"></script>
     <script src="js/game/Character.js"></script>
     <script src="js/game/GameState.js"></script>
     
+    <!-- ===== 战斗系统 ===== -->
     <script src="js/battle/SkillExecutor.js"></script>
     <script src="js/battle/BattleSystem.js"></script>
-    
-    <script src="js/characters/characterTemplates.js"></script>
+
+    <!-- ===== 角色系统 ===== -->
     <script src="js/characters/CharacterLoader.js"></script>
-    
+    <script src="js/characters/index.js"></script>
+
+    <!-- 友方角色 -->
+    <script src="js/characters/ally/Fangsuan.js"></script>
+    <script src="js/characters/ally/Trailblazer.js"></script>
+    <script src="js/characters/ally/SilverWolf.js"></script>
+
+    <!-- 敌方角色 -->
+    <script src="js/characters/enemy/AntimatterLegion.js"></script>
+
+    <!-- ===== UI与工具 ===== -->
     <script src="js/ui/BattleRenderer.js"></script>
     <script src="js/ui/SkillPanel.js"></script>
     <script src="js/ui/UIManager.js"></script>
     
     <script src="js/utils/Utils.js"></script>
+
+    <!-- ===== 主程序入口 ===== -->
     <script src="js/main.js"></script>
 </body>
 </html>

@@ -18,7 +18,6 @@ class CharacterLoader {
         const skills = {};
         template.skills.forEach(skillConfig => {
             const executeFunc = this.skillExecutor.getSkillFunction(skillConfig.executeFunc);
-            
             const tags = Array.isArray(skillConfig.tags) ? skillConfig.tags : [];
             
             skills[skillConfig.skillType] = new Skill(
@@ -47,88 +46,19 @@ class CharacterLoader {
         );
     }
 
-    loadDefaultCharacters() {
-        this.registerCharacterTemplate('Fangsuan', FangsuanTemplate);
-        this.registerCharacterTemplate('AntimatterLegion', AntimatterLegionTemplate);
-        this.registerCharacterTemplate('Trailblazer', TrailblazerTemplate);
-        this.registerCharacterTemplate('SilverWolf', SilverWolfTemplate);
-
+    /** 
+     * 根据配置创建多个角色实例
+     * 由外部传入角色名数组
+     */
+    loadCharacters(names = []) {
         const characters = [];
-        
-        characters.push(this.createCharacter('Fangsuan'));
-        characters.push(this.createCharacter('Trailblazer'));
-        characters.push(this.createCharacter('SilverWolf'));
-        
-        characters.push(this.createCharacter('AntimatterLegion'));
-        characters.push(this.createCharacter('AntimatterLegion'));
-        characters.push(this.createCharacter('AntimatterLegion'));
-        
-        return characters.filter(char => char !== null);
-    }
-
-    setupFollowUpAttacks(character, characterName) {
-        switch (characterName) {
-            case 'SilverWolf':
-                const silverWolfFollowUp = new Skill(
-                    "狼魂追击",
-                    "对目标发动120%攻击力的追加攻击",
-                    0,
-                    TargetType.SINGLE,
-                    SkillType.SPECIAL,
-                    DamageType.ICE,
-                    [SkillTag.ATTACK, SkillTag.SINGLE_TARGET, SkillTag.FOLLOW_UP],
-                    "🐾",
-                    this.skillExecutor.getSkillFunction('silverWolfFollowUp')
-                );
-                character.setFollowUpAttack(
-                    silverWolfFollowUp,
-                    0.4,
-                    [
-                        { type: 'targetHpBelow', value: 0.5 }
-                    ]
-                );
-                break;
-
-            case 'Trailblazer':
-                const trailblazerFollowUp = new Skill(
-                    "星芒追击",
-                    "对目标发动100%攻击力的追击",
-                    0,
-                    TargetType.SINGLE,
-                    SkillType.SPECIAL,
-                    DamageType.PHYSICAL,
-                    [SkillTag.ATTACK, SkillTag.SINGLE_TARGET, SkillTag.FOLLOW_UP],
-                    "⭐",
-                    this.skillExecutor.getSkillFunction('executeAttackSkill') // 使用通用的攻击函数
-                );
-                character.setFollowUpAttack(
-                    trailblazerFollowUp,
-                    0.3,
-                    [
-                        { type: 'afterSkill', skillTypes: [SkillType.BASIC] }
-                    ]
-                );
-                break;
-
-            case 'Fangsuan':
-                const fangsuanFollowUp = new Skill(
-                    "剑意追击",
-                    "宝剑引导的追加攻击，造成80%攻击力的量子伤害",
-                    0,
-                    TargetType.SINGLE,
-                    SkillType.SPECIAL,
-                    DamageType.QUANTUM,
-                    [SkillTag.ATTACK, SkillTag.SINGLE_TARGET, SkillTag.FOLLOW_UP],
-                    "⚔️",
-                    this.skillExecutor.getSkillFunction('executeAttackSkill') // 使用通用的攻击函数
-                );
-                character.setFollowUpAttack(
-                    fangsuanFollowUp,
-                    0,
-                    []
-                );
-                break;
+        for (const name of names) {
+            const character = this.createCharacter(name);
+            if (character) {
+                characters.push(character);
+            }
         }
+        return characters;
     }
 }
 
