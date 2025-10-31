@@ -4,7 +4,7 @@
 
 ## 中文
 
-网页版《崩坏：星穹铁道》游戏项目，欢迎各位开发者共同参与开发！
+网页版《崩铁》文字游戏项目，欢迎各位开发者共同参与开发！
 
 ### 项目简介
 
@@ -17,6 +17,13 @@
 - 🎯 复杂的伤害乘区计算
 - 🎨 精美的界面设计
 - 🔧 持续开发中
+
+### 未来计划
+
+- 选人系统
+- 自定义角色游戏接口
+- 更加方便的编写技能函数
+- 修复一堆BUG
 
 ### 参与贡献
 
@@ -75,7 +82,7 @@
 
 # WebGame-of-StarRail 🎮
 
-Web-based Honkai: Star Rail fan game project, welcome all developers to join the development!
+Web-based Honkai: Star Rail Word fan game project, welcome all developers to join the development!
 
 ### Project Introduction
 
@@ -89,6 +96,13 @@ This is a fan-made web-based implementation of Honkai: Star Rail. Due to the cha
 - 🎨 Beautiful interface design
 - 🔧 Continuously under development
 
+### Future Plans
+
+- Character Selection System
+- Custom Character Game Interface
+- More Convenient Skill Function Development
+- Fix Numerous Bugs
+  
 ### Contributing
 
 We highly welcome and encourage everyone to submit Pull Requests! Whether you want to:
