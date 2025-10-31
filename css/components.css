@@ -1,0 +1,347 @@
+/* 队伍样式 */
+.teams {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.team {
+    flex: 1;
+}
+
+.team-title {
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+    color: #5d7cff;
+}
+
+.team.enemy .team-title {
+    color: #ff4d7a;
+}
+
+.characters {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+}
+
+/* 角色卡片样式 */
+.character {
+    background: rgba(32, 32, 72, 0.8);
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid #4a4a8a;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+/* 新增：可选目标高亮样式 */
+.selectable-target {
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.7) !important;
+    border-color: #ffd700 !important;
+    cursor: pointer;
+    transform: scale(1.05);
+    transition: all 0.3s ease;
+}
+
+.selectable-target:hover {
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.9) !important;
+    transform: scale(1.08);
+}
+
+/* 新增：技能目标类型描述 */
+.skill-target-desc {
+    font-size: 0.6rem;
+    color: #b0b0ff;
+    margin-top: 3px;
+}
+
+
+.character:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(90, 70, 255, 0.4);
+}
+
+.character.enemy {
+    border-color: #ff4d7a;
+}
+
+.character.ally {
+    border-color: #5d7cff;
+}
+
+.character.active {
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.7);
+    border-color: #ffd700;
+}
+
+.character-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    margin: 0 auto 10px;
+    background: linear-gradient(135deg, #5d7cff, #a78bfa);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.character.enemy .character-icon {
+    background: linear-gradient(135deg, #ff4d7a, #ff8e53);
+}
+
+.character-name {
+    font-weight: bold;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+}
+
+.hp-bar {
+    height: 8px;
+    background: #2a2a5a;
+    border-radius: 4px;
+    margin: 8px 0;
+    overflow: hidden;
+}
+
+.hp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00ff88, #00ccff);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.enemy .hp-fill {
+    background: linear-gradient(90deg, #ff4d7a, #ff8e53);
+}
+
+.energy-bar {
+    height: 4px;
+    background: #2a2a5a;
+    border-radius: 2px;
+    margin: 5px 0;
+    overflow: hidden;
+}
+
+.energy-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ffd166, #ff9e6d);
+    border-radius: 2px;
+    transition: width 0.5s ease;
+}
+
+.character-stats {
+    font-size: 0.7rem;
+    color: #b0b0ff;
+}
+
+/* 状态效果样式 */
+.status-effects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+    justify-content: center;
+}
+
+.status-effect {
+    font-size: 0.6rem;
+    padding: 2px 5px;
+    border-radius: 3px;
+    background: rgba(90, 70, 255, 0.3);
+    cursor: help;
+}
+
+.buff-effect {
+    background: rgba(167, 139, 250, 0.3);
+}
+
+.debuff-effect {
+    background: rgba(255, 77, 122, 0.3);
+}
+
+/* 技能面板样式 */
+.current-turn {
+    text-align: center;
+    margin-bottom: 15px;
+    color: #ffd700;
+    font-weight: bold;
+}
+
+.turn-indicator {
+    text-align: center;
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 8px;
+    font-weight: bold;
+}
+
+.turn-indicator.player-turn {
+    background: rgba(93, 124, 255, 0.3);
+    color: #5d7cff;
+    border: 1px solid #5d7cff;
+}
+
+.turn-indicator.enemy-turn {
+    background: rgba(255, 77, 122, 0.3);
+    color: #ff4d7a;
+    border: 1px solid #ff4d7a;
+}
+
+.skills {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.skill {
+    background: rgba(32, 32, 72, 0.8);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    border: 1px solid #4a4a8a;
+    transition: all 0.3s ease;
+}
+
+.skill:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(90, 70, 255, 0.3);
+    border-color: #5d7cff;
+}
+
+.skill.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+    border-color: #4a4a8a;
+}
+
+.skill-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin: 0 auto 8px;
+    background: linear-gradient(135deg, #5d7cff, #a78bfa);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: white;
+}
+
+.skill-name {
+    font-weight: bold;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+}
+
+.skill-desc {
+    font-size: 0.65rem;
+    color: #b0b0ff;
+    margin: 2px 0;
+    line-height: 1.2;
+}
+
+/* 技能标签样式 */
+.skill-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin: 5px 0;
+}
+
+.skill-tag {
+    font-size: 0.6rem;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: white;
+    background: #5d7cff;
+}
+
+/* 伤害类型样式 */
+.damage-type {
+    font-size: 0.7rem;
+    margin: 3px 0;
+    font-weight: bold;
+}
+
+/* 抗性标签样式 */
+.resistances {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 5px;
+}
+
+.resistance-tag {
+    font-size: 0.6rem;
+    padding: 1px 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* 行动状态指示 */
+.action-status {
+    font-size: 0.6rem;
+    padding: 2px 4px;
+    border-radius: 3px;
+    margin: 3px 0;
+    text-align: center;
+}
+
+.cannot-act {
+    background: rgba(255, 77, 122, 0.3);
+    color: #ff4d7a;
+    border: 1px solid #ff4d7a;
+}
+
+/* 控制按钮样式 */
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+button {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #5d7cff, #a78bfa);
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(90, 70, 255, 0.3);
+}
+
+button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(90, 70, 255, 0.5);
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+button.reset {
+    background: linear-gradient(135deg, #ff4d7a, #ff8e53);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .characters {
+        grid-template-columns: 1fr;
+    }
+    
+    .skills {
+        grid-template-columns: 1fr;
+    }
+}

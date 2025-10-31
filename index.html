@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>崩坏：星穹铁道 - 网页版</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">崩坏：星穹铁道</div>
+            <div class="subtitle">网页版 - 完整修改版</div>
+        </header>
+
+        <div class="game-area">
+            <div class="battle-field">
+                <h2 class="battle-title">战斗区域</h2>
+                <div class="teams">
+                    <div class="team ally">
+                        <h3 class="team-title">我方队伍</h3>
+                        <div class="characters" id="allies-container">
+                            <!-- 我方角色将通过JS动态生成 -->
+                        </div>
+                    </div>
+                    <div class="team enemy">
+                        <h3 class="team-title">敌方队伍</h3>
+                        <div class="characters" id="enemies-container">
+                            <!-- 敌方角色将通过JS动态生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-panel">
+                <h2 class="battle-title">行动面板</h2>
+                <div class="turn-indicator" id="turn-indicator">玩家回合</div>
+                <div class="current-turn" id="current-turn">当前行动: 准备中...</div>
+                <div class="skills" id="skills-container">
+                    <!-- 技能将通过JS动态生成 -->
+                </div>
+                <div class="target-selection" id="target-selection" style="display: none;">
+                    <h3>选择目标</h3>
+                    <div class="targets" id="targets-container">
+                        <!-- 目标将通过JS动态生成 -->
+                    </div>
+                </div>
+                <div class="controls">
+                    <button class="reset" id="reset-game">重新开始</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="battle-log">
+            <h3 class="log-title">战斗日志</h3>
+            <div class="log-entries" id="log-entries">
+                <!-- 日志将通过JS动态生成 -->
+            </div>
+        </div>
+
+        <footer>
+            <p>本游戏为崩坏：星穹铁道的粉丝致敬作品，非官方游戏</p>
+            <p>© 2023 崩坏：星穹铁道网页版演示</p>
+        </footer>
+    </div>
+
+    <!-- 一次性加载所有JS文件 -->
+    <script src="js/game/Skill.js"></script>
+    <script src="js/game/StatusEffect.js"></script>
+    <script src="js/game/Character.js"></script>
+    <script src="js/game/GameState.js"></script>
+    
+    <script src="js/battle/SkillExecutor.js"></script>
+    <script src="js/battle/BattleSystem.js"></script>
+    
+    <script src="js/characters/characterTemplates.js"></script>
+    <script src="js/characters/CharacterLoader.js"></script>
+    
+    <script src="js/ui/BattleRenderer.js"></script>
+    <script src="js/ui/SkillPanel.js"></script>
+    <script src="js/ui/UIManager.js"></script>
+    
+    <script src="js/utils/Utils.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
