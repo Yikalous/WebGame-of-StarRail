@@ -1,6 +1,3 @@
-PR请提交到PR-Branch
-Please submit PR to PR Branch
-
 # WebGame-of-StarRail 🎮
 
 [中文](#中文) | [English](#english)
