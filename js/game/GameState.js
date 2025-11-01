@@ -119,14 +119,14 @@ class GameState {
 
         // 如果有当前行动角色，处理回合结束
         if (currentCharacter) {
-            console.log(`=== ${currentCharacter.name} 的回合结束 ===`);
-            
+        console.log(`=== ${currentCharacter.name} 的回合结束 ===`);
+
             // 处理回合开始前效果
-            this.handleTurnStartEffects(currentCharacter);
-            
+        this.handleTurnStartEffects(currentCharacter);
+
             // 处理回合结束后效果
-            this.handleTurnEndEffects(currentCharacter);
-            
+        this.handleTurnEndEffects(currentCharacter);
+
             // 消耗行动值（减去500）
             currentCharacter.consumeAction();
             

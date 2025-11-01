@@ -14,9 +14,9 @@ class UIManager {
         const resetBtn = document.getElementById('reset-game');
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
-                this.gameState.resetGame();
-                this.updateUI();
-            });
+            this.gameState.resetGame();
+            this.updateUI();
+        });
         } else {
             console.warn('reset-game按钮未找到，可能选人界面尚未切换');
         }

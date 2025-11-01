@@ -74,8 +74,10 @@ class SkillPanel {
             [SkillTag.COUNTER]: '反击',
             [SkillTag.FOLLOW_UP]: '追击',
             [SkillTag.BREAK]: '破盾',
-            [SkillTag.AOE]: '范围',
-            [SkillTag.SINGLE_TARGET]: '单体'
+            [SkillTag.AOE]: '群攻',
+            [SkillTag.SINGLE_TARGET]: '单体',
+            [SkillTag.SPREAD]: '扩散',
+            [SkillTag.BOUND]: '弹射',
         };
         return texts[tag] || tag;
     }
@@ -89,7 +91,7 @@ class SkillPanel {
             [DamageType.QUANTUM]: '量子',
             [DamageType.IMAGINARY]: '虚数',
             [DamageType.WIND]: '风',
-            [DamageType.PURE]: '纯粹'
+            [DamageType.PURE]: '真实'
         };
         return texts[damageType] || '';
     }

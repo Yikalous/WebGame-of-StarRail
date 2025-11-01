@@ -6,14 +6,70 @@
 }
 
 body {
-    background: linear-gradient(135deg, #0c0c2e 0%, #1a1a4a 100%);
-    color: #e0e0ff;
+    /* 蓝色主色调渐变天空 */
+    background:
+        radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), transparent 40%),
+        radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.2), transparent 50%),
+        /* 像素方块感的随机分布方块 */
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05) 2px, transparent 2px, transparent 4px),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05) 2px, transparent 2px, transparent 4px),
+        linear-gradient(to bottom, #70bfff, #3169b4);
+    /* Minecraft天空蓝渐变 */
+
+    background-blend-mode: screen, screen, normal, normal, normal;
+    background-size: cover, cover, 100px 100px, 100px 100px, cover;
+    background-attachment: fixed;
+    background-repeat: no-repeat, no-repeat, repeat, repeat, no-repeat;
+
+    color: #f0f0f0;
+    line-height: 1.6;
     min-height: 100vh;
-    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    cursor: default;
+}
+
+footer {
+    background-color: rgba(10, 20, 40, 0.9);
+    text-align: center;
+    padding: 1.5rem;
+    color: #a0c8ff;
+}
+
+.footer-content {
+    margin: 0 auto;
+}
+
+main {
+    flex: 1;
+    padding: 2rem;
+    width: 100%;
+
+    background-color: rgba(20, 30, 70, 0.6);
+    /* 半透明深蓝 */
+    backdrop-filter: blur(8px);
+    /* 背景模糊 */
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.page-title {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    color: #ffffff;
+}
+
+.page-title h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.page-title p {
+    color: #a0c8ff;
+    font-size: 1.2rem;
 }
 
 .container {
-    max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
 }
@@ -54,7 +110,6 @@ header {
 
 .battle-field {
     flex: 2;
-    min-width: 600px;
     background: rgba(16, 16, 48, 0.7);
     border-radius: 15px;
     padding: 20px;
@@ -72,7 +127,6 @@ header {
 
 .action-panel {
     flex: 1;
-    min-width: 300px;
     background: rgba(16, 16, 48, 0.7);
     border-radius: 15px;
     padding: 20px;
@@ -83,11 +137,10 @@ header {
 .battle-log {
     background: rgba(16, 16, 48, 0.7);
     border-radius: 15px;
+    width: 20%;
     padding: 20px;
     border: 1px solid #3a3a7a;
     box-shadow: 0 0 20px rgba(90, 70, 255, 0.2);
-    margin-bottom: 30px;
-    max-height: 200px;
     overflow-y: auto;
 }
 
@@ -105,13 +158,6 @@ header {
 
 .log-entry:last-child {
     border-bottom: none;
-}
-
-footer {
-    text-align: center;
-    padding: 20px;
-    color: #8080cc;
-    font-size: 0.9rem;
 }
 
 .damage {

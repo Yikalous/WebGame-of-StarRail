@@ -167,7 +167,7 @@ class Character {
 
     // ===== 通用技能接口 =====
     // Character.js - 修改 Attack 方法
-    Attack(type, baseStat = "attack", basenumber = [100], ratio = [1.0], target = this, damageType = DamageType.PHYSICAL, times = 1, skillType = SkillType.BASIC) {
+    Attack(type, baseStat = "attack", basenumber = [100], ratio = [1.0], target = this, damageType = DamageType.PHYSICAL, damageStyle = [], times = 1, skillType = SkillType.BASIC) {
         const actualTarget = target || this;
 
         switch (type) {
@@ -311,13 +311,14 @@ class Character {
                 break;
 
             case "SPREAD":
-                if (enemies.length === 0) {
+                const SpreadEnemies = this.GetTargets("ALL_ENEMIES");
+                if (SpreadEnemies.length === 0) {
                     this.Log("没有可攻击的敌人", 'debuff');
                     return;
                 }
 
                 // 找到主目标在敌人列表中的位置
-                const mainTargetIndex = enemies.findIndex(enemy => enemy === actualTarget);
+                const mainTargetIndex = SpreadEnemies.findIndex(enemy => enemy === actualTarget);
                 if (mainTargetIndex === -1) {
                     this.Log("主目标无效", 'debuff');
                     return;
@@ -348,7 +349,7 @@ class Character {
                 }
 
                 // 对相邻目标造成伤害（使用第二个倍率）
-                const adjacentTargets = this.getAdjacentTargets(enemies, mainTargetIndex);
+                const adjacentTargets = this.getAdjacentTargets(SpreadEnemies, mainTargetIndex);
 
                 adjacentTargets.forEach(adjacentTarget => {
                     for (let i = 0; i < times; i++) {

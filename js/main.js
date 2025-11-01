@@ -36,11 +36,11 @@ document.addEventListener('DOMContentLoaded', function () {
             
             // 添加选中的友方角色
             selectedCharacters.forEach(character => {
-                if (character) gameState.addCharacter(character);
-            });
-            
+            if (character) gameState.addCharacter(character);
+        });
+
             // 添加敌方角色（固定3个正物质军团）
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i < 5; i++) {
                 const enemy = characterLoader.createCharacter("AntimatterLegion");
                 if (enemy) gameState.addCharacter(enemy);
             }
@@ -51,23 +51,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 // 初始化速度条系统
                 gameState.initializeSpeedSystem();
                 
-                // 初始化UI系统
-                const uiManager = new UIManager(gameState, battleSystem);
-                uiManager.updateUI();
-                
-                // 输出信息
-                console.log('崩坏：星穹铁道游戏初始化完成！');
+        // 初始化UI系统
+        const uiManager = new UIManager(gameState, battleSystem);
+        uiManager.updateUI();
+
+        // 输出信息
+        console.log('崩坏：星穹铁道游戏初始化完成！');
                 console.log('友方角色:', selectedCharacters.map(c => c.name));
                 console.log('敌方角色:', gameState.getEnemies().map(c => c.name));
 
-                // 暴露全局
-                window.game = {
-                    gameState,
-                    battleSystem,
-                    characterLoader,
-                    uiManager,
+        // 暴露全局
+        window.game = {
+            gameState,
+            battleSystem,
+            characterLoader,
+            uiManager,
                     characters: gameState.characters
-                };
+        };
             }, 50);
         });
 

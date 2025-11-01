@@ -1,13 +1,37 @@
 /* 队伍样式 */
 .teams {
     display: flex;
-    justify-content: space-between;
-    gap: 20px;
+    flex-direction: column; /* 改为垂直排列 */
+    gap: 30px; /* 增加间距 */
 }
 
 .team {
-    flex: 1;
+    width: 100%; /* 改为全宽 */
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* 居中 */
 }
+
+/* 敌方队伍最多5人 - 修改这里 */
+#enemies-container {
+    display: flex; /* 改为flex布局 */
+    justify-content: center; /* 居中 */
+    gap: 15px;
+    max-width: 800px; /* 限制最大宽度 */
+    width: 100%;
+    flex-wrap: nowrap; /* 禁止换行 */
+}
+
+/* 友方队伍最多4人 - 修改这里 */
+#allies-container {
+    display: flex; /* 改为flex布局 */
+    justify-content: center; /* 居中 */
+    gap: 15px;
+    max-width: 640px; /* 限制最大宽度 */
+    width: 100%;
+    flex-wrap: nowrap; /* 禁止换行 */
+}
+
 
 .team-title {
     text-align: center;
@@ -20,10 +44,11 @@
     color: #ff4d7a;
 }
 
-.characters {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
+.character {
+    min-width: 120px; /* 设置最小宽度 */
+    width: 100%; /* 宽度自适应 */
+    flex: 1; /* 等分宽度 */
+    max-width: 150px; /* 限制最大宽度 */
 }
 
 /* 角色卡片样式 */

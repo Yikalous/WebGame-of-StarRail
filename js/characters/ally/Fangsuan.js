@@ -14,7 +14,7 @@
         icon: "🧙",
         skills: [
             {
-                name: "普通攻击",
+                name: "平凡一击",
                 description: "对敌方主目标造成量子伤害",
                 targetType: TargetType.SINGLE,
                 skillType: SkillType.BASIC,
@@ -27,7 +27,7 @@
                     const actualTarget = target || (enemies.length > 0 ? enemies[0] : null);
 
                     if (actualTarget) {
-                        user.Attack("SINGLE", "attack", [1100], [3.0], actualTarget, DamageType.QUANTUM);
+                        user.Attack("SINGLE", "attack", [1100], [3.0], actualTarget, DamageType.QUANTUM, [DamageStyle.BASIC]);
                     } else {
                         user.Log("没有可攻击的目标", 'debuff');
                     }
@@ -36,18 +36,24 @@
             {
                 name: "死之剑",
                 description: "前劈宝剑，发出剑气",
-                targetType: TargetType.ALL_ENEMIES,
+                targetType: TargetType.SINGLE,
                 skillType: SkillType.SPECIAL,
-                damageType: DamageType.QUANTUM,
-                tags: [SkillTag.ATTACK, SkillTag.AOE, SkillTag.BREAK],
+                tags: [SkillTag.ATTACK, SkillTag.SPREAD, SkillTag.BREAK],
                 icon: "⚰️",
                 filter: function (user, target, allCharacters) {  // 修正为3个参数
                     return user.hasStatusEffect("无敌之王的加冕");
                 },
                 PointCost: 0,
                 executeFunc: function (user, target, allCharacters) {
+                    const enemies = allCharacters.filter(c => c.type === 'enemy' && c.currentHp > 0);
+                    const mainTarget = target || enemies[0];
+                    if (!mainTarget) {
+                        user.Log("没有可攻击的目标", 'warn');
+                        return;
+                    }
 
-                    user.Attack("AOE", "attack", [700], [2.0], null, DamageType.QUANTUM);
+                    // SPREAD攻击逻辑：主目标+溅射
+                    user.Attack("SPREAD", "attack", [2250, 1250], [2.0, 3.0], mainTarget, DamageType.QUANTUM, [DamageStyle.SPREAD]);
                 }
             },
             {
@@ -66,7 +72,7 @@
 
                     allCharacters.forEach(c => {
                         if (c.type === 'enemy') {
-                            c.addStatusEffect("死之剑的诅咒", "damageTakenBonus", 1.0, 3, 'self', 'end');
+                            c.addStatusEffect("死之剑的诅咒", "damageTakenBonus", 10.0, 3, 'self', 'end');
                         }
                     });
 
