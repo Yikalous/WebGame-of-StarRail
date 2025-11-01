@@ -29,6 +29,7 @@
         // 只注册模板，不创建实例，角色在选人界面中选择
         maybeRegisterTemplate("registerFangsuan");
         maybeRegisterTemplate("registerHuangmi");
+        maybeRegisterTemplate("registerYushi");
 
         // === 敌方角色 ===
         // 敌方角色模板也需要注册（但不在选人界面中显示）

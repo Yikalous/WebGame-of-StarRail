@@ -191,6 +191,11 @@ class GameState {
     }
 
     handleTurnStartEffects(character) {
+        // 重置逾柿的"眼的回想"本回合触发标志
+        if (character.passiveSkills && character.passiveSkills.eyeRecall) {
+            character.passiveSkills.eyeRecall.triggeredThisTurn = false;
+        }
+        
         // 只处理 triggerTime === 'start' 的效果
         this.processStatusEffects(character, 'start');
     }
@@ -246,6 +251,30 @@ class GameState {
                         this.addLog(`${character.name} 受到骑士之道治疗 ${healAmount} 点生命`, 'heal');
                     }
                 }
+                
+                // 该隐印记：回合结束时减少一层
+                if (effect.name === "该隐印记" && effect.value) {
+                    effect.value = Math.max(0, effect.value - 1);
+                    if (effect.value <= 0) {
+                        // 移除该隐印记和相关的攻击加成
+                        character.statusEffects = character.statusEffects.filter(e => 
+                            e.name !== "该隐印记" && e.name !== "该隐印记-攻击"
+                        );
+                        this.addLog(`${character.name} 的该隐印记消失了`, 'debuff');
+                    } else {
+                        // 更新攻击力加成
+                        const attackEffect = character.statusEffects.find(e => e.name === "该隐印记-攻击");
+                        if (attackEffect) {
+                            attackEffect.attackPercent = 0.3 * effect.value;
+                        }
+                        this.addLog(`${character.name} 的该隐印记减少至 ${effect.value} 层`, 'debuff');
+                    }
+                }
+                
+                // 火翼的护盾处理（如果需要）
+                if (effect.name === "火翼的护盾" && effect.value) {
+                    // 护盾在受到伤害时减少，这里可以添加相关逻辑
+                }
             });
         }
     }
@@ -261,6 +290,88 @@ class GameState {
                     this.addLog(`${newCharacter.name}被眩晕，无法行动`, 'debuff');
                 }
             }
+        });
+        
+        // 处理"下回合给予该隐印记"效果（必须在processStatusEffects之前，否则duration减少后可能被移除）
+        const markEffect = newCharacter.statusEffects.find(e => e.name === "下回合给予该隐印记");
+        if (markEffect) {
+            console.log(`处理 ${newCharacter.name} 的"下回合给予该隐印记"，value=${markEffect.value}`);
+            this.grantCainMark(newCharacter, markEffect.value || 2);
+            // 移除标记效果
+            newCharacter.statusEffects = newCharacter.statusEffects.filter(e => e !== markEffect);
+        } else {
+            // 调试：检查是否有类似的状态效果
+            const similarEffects = newCharacter.statusEffects.filter(e => e.name && e.name.includes('该隐'));
+            if (similarEffects.length > 0) {
+                console.log(`${newCharacter.name} 有相关状态效果:`, similarEffects.map(e => e.name));
+            }
+        }
+
+        // 处理回合开始时的状态效果（包括减少duration和移除过期效果）
+        this.handleTurnStartEffects(newCharacter);
+        
+        // 处理额外行动次数
+        if (newCharacter.extraActionCount && newCharacter.extraActionCount > 0) {
+            newCharacter.hasExtraAction = true;
+            newCharacter.extraActionCount--;
+            this.addLog(`${newCharacter.name} 获得额外行动机会（剩余 ${newCharacter.extraActionCount} 次）`, 'buff');
+        }
+        
+        // 处理逾柿的亡语效果（每回合开始时）
+        const deadYushi = this.characters.find(c => c.name === "逾柿" && c.deathRattleActive);
+        if (deadYushi && deadYushi.passiveSkills && deadYushi.passiveSkills.deathRattle) {
+            if (deadYushi.passiveSkills.deathRattle.onTurnStart) {
+                deadYushi.passiveSkills.deathRattle.onTurnStart(deadYushi, this.characters, this);
+            }
+        }
+    }
+    
+    // 给予该隐印记
+    grantCainMark(yushi, count) {
+        const allies = this.characters.filter(c => c.type === 'ally' && c.currentHp > 0 && c !== yushi);
+        
+        // 优先选择钫酸
+        const fangsuan = allies.find(c => c.name === "钫酸");
+        const recipients = [];
+        
+        if (fangsuan) {
+            recipients.push(fangsuan);
+        }
+        
+        // 添加其他盟友，直到达到指定数量
+        for (let ally of allies) {
+            if (recipients.length >= count) break;
+            if (ally !== fangsuan) {
+                recipients.push(ally);
+            }
+        }
+        
+        // 给自身和选中的队友添加该隐印记
+        [yushi, ...recipients].forEach(char => {
+            // 查找或创建该隐印记
+            let cainMark = char.statusEffects.find(e => e.name === "该隐印记");
+            if (!cainMark) {
+                cainMark = new StatusEffect("该隐印记", 999);
+                cainMark.turnType = 'self';
+                cainMark.triggerTime = 'end';
+                cainMark.owner = char;
+                cainMark.value = 0; // 存储层数
+                cainMark.appliedTurn = this.turnCount || 0;
+                char.statusEffects.push(cainMark);
+            }
+            
+            // 增加层数
+            cainMark.value = (cainMark.value || 0) + 1;
+            
+            // 更新攻击力加成（根据层数）
+            let attackEffect = char.statusEffects.find(e => e.name === "该隐印记-攻击");
+            if (!attackEffect) {
+                char.addStatusEffect("该隐印记-攻击", "attackPercent", 0.3 * cainMark.value, 999, 'self', 'end');
+            } else {
+                attackEffect.attackPercent = 0.3 * cainMark.value;
+            }
+            
+            this.addLog(`${char.name} 获得该隐印记（层数：${cainMark.value}，攻击力+${(0.3 * cainMark.value * 100).toFixed(0)}%）`, 'buff');
         });
     }
 

@@ -180,7 +180,7 @@ class Character {
 
                     if (actualTarget.currentHp > 0) {
                         const finalDamage = this.calculateDamage(totalDamage, damageType, skillType, actualTarget);
-                        const survived = actualTarget.takeDamage(finalDamage, damageType);
+                        const survived = actualTarget.takeDamage(finalDamage, damageType, this);
                         const critText = this.critArea > 1 ? " (暴击!)" : "";
                         this.Log(`${this.name}对${actualTarget.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
 
@@ -223,7 +223,7 @@ class Character {
                         if (enemy.currentHp > 0) {
                             const finalDamage = this.calculateDamage(totalDamage, damageType, skillType, enemy);
                             totalAoeDamage += finalDamage; // 累加总伤害
-                            const survived = enemy.takeDamage(finalDamage, damageType);
+                            const survived = enemy.takeDamage(finalDamage, damageType, this);
                             const critText = this.critArea > 1 ? " (暴击!)" : "";
                             this.Log(`${this.name}对${enemy.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
 
@@ -278,7 +278,7 @@ class Character {
                     if (randomTarget.currentHp > 0) {
                         const finalDamage = this.calculateDamage(totalDamage, damageType, skillType, randomTarget);
                         totalBoundDamage += finalDamage; // 累加总伤害
-                        const survived = randomTarget.takeDamage(finalDamage, damageType);
+                        const survived = randomTarget.takeDamage(finalDamage, damageType, this);
                         const critText = this.critArea > 1 ? " (暴击!)" : "";
                         this.Log(`第${i + 1}段弹射对${randomTarget.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
 
@@ -337,7 +337,7 @@ class Character {
                     if (actualTarget.currentHp > 0) {
                         const finalMainDamage = this.calculateDamage(mainDamage, damageType, skillType, actualTarget);
                         totalSpreadDamage += finalMainDamage; // 累加总伤害
-                        const survived = actualTarget.takeDamage(finalMainDamage, damageType);
+                        const survived = actualTarget.takeDamage(finalMainDamage, damageType, this);
                         const critText = this.critArea > 1 ? " (暴击!)" : "";
                         this.Log(`${this.name}对${actualTarget.name}造成${finalMainDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
 
@@ -360,7 +360,7 @@ class Character {
                         if (adjacentTarget.currentHp > 0) {
                             const finalSpreadDamage = this.calculateDamage(spreadDamage, damageType, skillType, adjacentTarget);
                             totalSpreadDamage += finalSpreadDamage; // 累加总伤害
-                            const survived = adjacentTarget.takeDamage(finalSpreadDamage, damageType);
+                            const survived = adjacentTarget.takeDamage(finalSpreadDamage, damageType, this);
                             const critText = this.critArea > 1 ? " (暴击!)" : "";
                             this.Log(`扩散对${adjacentTarget.name}造成${finalSpreadDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
 
@@ -440,15 +440,18 @@ class Character {
 
     ApplyDamage(target, dmg, type = DamageType.PHYSICAL) {
         const result = this.calculateFinalDamage(dmg, type);
-        target.takeDamage(result.damage, type);
+        target.takeDamage(result.damage, type, this);
         const critText = result.isCrit ? " (暴击!)" : "";
         this.Log(`${this.name}对${target.name}造成${result.damage}${critText}点${type}伤害`, 'damage');
     }
 
     // Character.js - 更新 takeDamage 方法
-    takeDamage(amount, type) {
+    takeDamage(amount, type, attacker = null) {
         // 免疫死亡状态检查（检查免疫致命伤次数）
-        if (amount >= this.currentHp) {
+        let isFatalDamage = amount >= this.currentHp;
+        let wasImmuneDeath = false;
+        
+        if (isFatalDamage) {
             const immuneEffects = this.statusEffects.filter(e => e.isImmuneDeath);
             if (immuneEffects.length > 0) {
                 // 消耗一次免疫致命伤
@@ -460,8 +463,36 @@ class Character {
                         this.statusEffects = this.statusEffects.filter(e => e !== immuneEffect);
                     }
                     this.currentHp = 1;
+                    wasImmuneDeath = true;
                     this.Log(`${this.name} 免疫了致命伤害！`, 'buff');
+                    
+                    // 免疫死亡也算触发致死伤害，检查眼的回想
+                    // 即使免疫死亡成功，也应该标记triggeredThisTurn（如果满足条件），使终结技能够触发
+                    if (this.passiveSkills && this.passiveSkills.eyeRecall) {
+                        const eyeRecall = this.passiveSkills.eyeRecall;
+                        // 检查队友是否全部存活（眼的回想的触发条件）
+                        const allies = (this.gameState ? this.gameState.characters : []).filter(c => c.type === 'ally' && c.currentHp > 0);
+                        const allAlive = allies.length === (this.gameState ? this.gameState.getAllies().length : 0);
+                        
+                        // 如果队友全部存活，标记triggeredThisTurn（即使used已经是true，免疫死亡也算触发）
+                        if (allAlive) {
+                            eyeRecall.triggeredThisTurn = true;
+                            this.Log(`${this.name} 免疫致命伤害，触发眼的回想标记（可用于终结技）`, 'buff');
+                        }
+                    }
+                    
                     return true;
+                }
+            }
+            
+            // 检查逾柿的"眼的回想"被动技能（在没有免疫死亡的情况下）
+            if (this.passiveSkills && this.passiveSkills.eyeRecall) {
+                const eyeRecall = this.passiveSkills.eyeRecall;
+                if (eyeRecall.onFatalDamage && typeof eyeRecall.onFatalDamage === 'function') {
+                    const saved = eyeRecall.onFatalDamage(this, this.gameState ? this.gameState.characters : []);
+                    if (saved) {
+                        return true; // 成功触发眼的回想，保持1血
+                    }
                 }
             }
         }
@@ -469,15 +500,35 @@ class Character {
         this.currentHp = Math.max(0, this.currentHp - amount);
         const survived = this.currentHp > 0;
         
-        // 检测友方死亡，触发被动技能
-        if (!survived && this.type === 'ally' && this.gameState) {
-            // 检查是否有荒弥在场，触发被动技能
-            const huangmi = this.gameState.characters.find(c => 
-                c.name === "荒弥" && c.currentHp > 0 && c.passiveSkills && c.passiveSkills.limpingAlone
-            );
+        // 检测角色死亡
+        if (!survived && this.gameState) {
+            // 检查是否被队友击杀（逾柿的特殊机制）
+            if (this.name === "逾柿" && attacker && attacker.type === 'ally' && attacker !== this) {
+                // 队友击杀逾柿，给予额外行动机会
+                if (!attacker.extraActionCount) {
+                    attacker.extraActionCount = 0;
+                }
+                attacker.extraActionCount += 2; // 下两回合可多行动一次
+                this.gameState.addLog(`${attacker.name} 击杀了 ${this.name}，获得下两回合额外行动机会！`, 'buff');
+            }
             
-            if (huangmi && huangmi.passiveSkills.limpingAlone) {
-                huangmi.passiveSkills.limpingAlone.onAllyDeath(huangmi, this, this.gameState.characters);
+            // 检测友方死亡，触发被动技能
+            if (this.type === 'ally') {
+                // 检查是否有荒弥在场，触发被动技能
+                const huangmi = this.gameState.characters.find(c => 
+                    c.name === "荒弥" && c.currentHp > 0 && c.passiveSkills && c.passiveSkills.limpingAlone
+                );
+                
+                if (huangmi && huangmi.passiveSkills.limpingAlone) {
+                    huangmi.passiveSkills.limpingAlone.onAllyDeath(huangmi, this, this.gameState.characters);
+                }
+                
+                // 检查逾柿的亡语效果
+                if (this.name === "逾柿" && this.passiveSkills && this.passiveSkills.deathRattle) {
+                    // 标记死亡，启动亡语效果
+                    this.isDead = true;
+                    this.deathRattleActive = true;
+                }
             }
         }
         
@@ -603,6 +654,15 @@ class Character {
             vulnerability += effect.vulnerability || 0;
             vulnerability += effect.damageTakenBonus || 0;
         });
+        
+        // 该隐印记：对敌方施加负面效果强度加20%
+        // 这里处理该隐印记持有者攻击时，对敌方的负面效果强度加成
+        const cainMark = this.statusEffects.find(e => e.name === "该隐印记");
+        if (cainMark && cainMark.value > 0 && target.type === 'enemy') {
+            // 对易伤效果增加20%强度
+            vulnerability *= 1.2;
+        }
+        
         return 1 + vulnerability;
     }
 

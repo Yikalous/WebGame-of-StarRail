@@ -63,15 +63,50 @@ class CharacterLoader {
             template.icon
         );
         
+        // 复制tag属性（如果模板中有定义）
+        if (template.tag !== undefined) {
+            character.tag = template.tag;
+        }
+        
         // 添加被动技能（如果模板中有定义）
         if (template.passiveSkills) {
+            // 深拷贝被动技能，但需要从原始模板中获取函数引用
             character.passiveSkills = JSON.parse(JSON.stringify(template.passiveSkills));
-            // 绑定上下文到被动技能方法
-            if (character.passiveSkills && character.passiveSkills.limpingAlone) {
+            
+            // 从原始模板中保存函数引用（因为 JSON 序列化会丢失函数）
+            const templatePassiveSkills = template.passiveSkills;
+            
+            // 绑定荒弥的被动技能
+            if (character.passiveSkills && character.passiveSkills.limpingAlone && templatePassiveSkills.limpingAlone) {
                 const limpingAlone = character.passiveSkills.limpingAlone;
-                character.passiveSkills.limpingAlone.onAllyDeath = function(huangmi, deadAlly, allCharacters) {
-                    limpingAlone.onAllyDeath.call(limpingAlone, huangmi, deadAlly, allCharacters);
-                };
+                const originalOnAllyDeath = templatePassiveSkills.limpingAlone.onAllyDeath; // 从模板中获取原始函数
+                if (originalOnAllyDeath && typeof originalOnAllyDeath === 'function') {
+                    character.passiveSkills.limpingAlone.onAllyDeath = function(huangmi, deadAlly, allCharacters) {
+                        return originalOnAllyDeath.call(limpingAlone, huangmi, deadAlly, allCharacters);
+                    };
+                }
+            }
+            
+            // 绑定逾柿的被动技能
+            if (character.passiveSkills && character.passiveSkills.eyeRecall && templatePassiveSkills.eyeRecall) {
+                const eyeRecall = character.passiveSkills.eyeRecall;
+                const originalOnFatalDamage = templatePassiveSkills.eyeRecall.onFatalDamage; // 从模板中获取原始函数
+                if (originalOnFatalDamage && typeof originalOnFatalDamage === 'function') {
+                    character.passiveSkills.eyeRecall.onFatalDamage = function(yushi, allCharacters) {
+                        return originalOnFatalDamage.call(eyeRecall, yushi, allCharacters);
+                    };
+                }
+            }
+            
+            // 绑定逾柿的亡语效果
+            if (character.passiveSkills && character.passiveSkills.deathRattle && templatePassiveSkills.deathRattle) {
+                const deathRattle = character.passiveSkills.deathRattle;
+                const originalOnTurnStart = templatePassiveSkills.deathRattle.onTurnStart; // 从模板中获取原始函数
+                if (originalOnTurnStart && typeof originalOnTurnStart === 'function') {
+                    character.passiveSkills.deathRattle.onTurnStart = function(yushi, allCharacters, gameState) {
+                        return originalOnTurnStart.call(deathRattle, yushi, allCharacters, gameState);
+                    };
+                }
             }
         }
         

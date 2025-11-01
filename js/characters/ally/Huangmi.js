@@ -3,6 +3,7 @@
     const FangsuanTemplate = {
         name: "荒弥",
         type: "ally",
+        tag: "knight",
         maxHp: 3000,
         attack: 3271,
         defense: 800,
@@ -147,8 +148,8 @@
                     const avgAttack = Math.floor(totalAttack / allies.length);
                     const avgMaxHp = Math.floor(totalMaxHp / allies.length);
                     
-                    // 检查是否存在钫酸
-                    const hasFangsuan = allies.some(ally => ally.name === "钫酸");
+                    // 检查是否存在钫酸（tag 为 knight 的角色）
+                    const hasFangsuan = allies.some(ally => ally.tag === "knight" && ally.name === "钫酸");
                     const finalAttack = hasFangsuan ? avgAttack * 2 : avgAttack;
                     const finalMaxHp = hasFangsuan ? avgMaxHp * 2 : avgMaxHp;
                     
@@ -169,16 +170,11 @@
                     user.Log(`所有友方的攻击力统一为 ${finalAttack}，生命上限统一为 ${finalMaxHp}${hasFangsuan ? '（钫酸加成）' : ''}`, 'buff');
                     
                     // 获得立即行动机会
-                    user.hasExtraAction = true;
-                    user.Log(`${user.name} 获得立即行动机会！`, 'buff');
+                    
                     
                     // 3. 检测骑士数量并激活[骑士之道]效果
-                    // 假设"骑士"是指名字包含"骑士"或特定角色
-                    const knights = allies.filter(ally => 
-                        ally.name.includes("骑士") || 
-                        ally.name === "钫酸" || 
-                        ally.name === "荒弥"
-                    );
+                    // 检测 tag 为 "knight" 的友方角色
+                    const knights = allies.filter(ally => ally.tag === "knight");
                     
                     if (knights.length >= 1) {
                         user.Log(`[骑士之道]激活！检测到 ${knights.length} 名骑士`, 'buff');
@@ -249,6 +245,8 @@
                             manastealEffect.value = 1; // 存储魔力吸取比例
                             manastealEffect.appliedTurn = user.gameState?.turnCount || 0;
                             user.statusEffects.push(manastealEffect);}
+                    user.hasExtraAction = true;
+                    user.Log(`${user.name} 获得立即行动机会！`, 'buff');
                         
                     }
                 }
