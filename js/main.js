@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
             // 添加敌方角色（固定3个正物质军团）
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i < 5; i++) {
                 const enemy = characterLoader.createCharacter("AntimatterLegion");
                 if (enemy) gameState.addCharacter(enemy);
             }
