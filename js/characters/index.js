@@ -9,34 +9,32 @@
     }
 
     /**
-     * 注册并创建所有角色
+     * 注册所有角色模板（不创建实例）
      * @param {CharacterLoader} loader
-     * @returns {Character[]} 已创建角色数组
+     * @returns {void}
      */
     window.registerAllCharacters = function(loader) {
-        const characters = [];
-
-        // 检查各角色注册函数是否存在
-        const maybeRegister = (fnName, count = 1) => {
+        // 检查各角色注册函数是否存在并注册模板
+        const maybeRegisterTemplate = (fnName) => {
             const fn = window[fnName];
             if (typeof fn === "function") {
-                for (let i = 0; i < count; i++) {
-                    const char = fn(loader);
-                    if (char) characters.push(char);
-                }
+                // 调用注册函数，这会注册模板到loader中
+                fn(loader);
             } else {
                 console.warn(`⚠️ 未找到 ${fnName}()，请确认角色文件是否正确加载。`);
             }
         };
 
         // === 我方角色 ===
-        maybeRegister("registerFangsuan");
+        // 只注册模板，不创建实例，角色在选人界面中选择
+        maybeRegisterTemplate("registerFangsuan");
+        maybeRegisterTemplate("registerHuangmi");
 
-        // === 敌方角色（重复3次） ===
-        maybeRegister("registerAntimatterLegion", 3);
+        // === 敌方角色 ===
+        // 敌方角色模板也需要注册（但不在选人界面中显示）
+        maybeRegisterTemplate("registerAntimatterLegion");
 
-        console.log(`✅ 已注册 ${characters.length} 个角色:`, characters.map(c => c.name));
-        return characters;
+        console.log(`✅ 已注册角色模板:`, Object.keys(loader.characterTemplates));
     };
 
 })();

@@ -49,7 +49,7 @@ class CharacterLoader {
             console.warn(`角色 ${characterName} 没有定义技能`);
         }
 
-        return new Character(
+        const character = new Character(
             template.name,
             template.type,
             template.maxHp,
@@ -62,6 +62,20 @@ class CharacterLoader {
             skills,
             template.icon
         );
+        
+        // 添加被动技能（如果模板中有定义）
+        if (template.passiveSkills) {
+            character.passiveSkills = JSON.parse(JSON.stringify(template.passiveSkills));
+            // 绑定上下文到被动技能方法
+            if (character.passiveSkills && character.passiveSkills.limpingAlone) {
+                const limpingAlone = character.passiveSkills.limpingAlone;
+                character.passiveSkills.limpingAlone.onAllyDeath = function(huangmi, deadAlly, allCharacters) {
+                    limpingAlone.onAllyDeath.call(limpingAlone, huangmi, deadAlly, allCharacters);
+                };
+            }
+        }
+        
+        return character;
     }
 
     loadCharacters(names = []) {
