@@ -6,16 +6,16 @@ class BattleSystem {
 
     executeSkill(skill, user, target = null) {
         // 处理战技点消耗/回复
-        if (skill.energyCost !== 0) {
-            if (skill.energyCost > 0) {
+        if (skill.PointCost !== 0) {
+            if (skill.PointCost > 0) {
                 // 正数：消耗战技点
-                if (!user.useEnergy(skill.energyCost)) {
+                if (!user.usePoint(skill.PointCost)) {
                     return true;
                 }
-            } else if (skill.energyCost < 0) {
+            } else if (skill.PointCost < 0) {
                 // 负数：回复战技点
-                const energyGain = Math.abs(skill.energyCost);
-                user.gainEnergy(energyGain);
+                const PointGain = Math.abs(skill.PointCost);
+                user.gainPoint(PointGain);
             }
         }
 
@@ -46,7 +46,7 @@ class BattleSystem {
 
     isSkillAvailable(skill, user) {
         // 检查战技点
-        if (user.currentEnergy < skill.energyCost) {
+        if (user.currentPoint < skill.PointCost) {
             return false;
         }
 
@@ -125,7 +125,7 @@ class BattleSystem {
                     break;
             }
 
-            if (enemy.currentEnergy >= skill.energyCost * 2) {
+            if (enemy.currentPoint >= skill.PointCost * 2) {
                 weight += 1;
             }
 

@@ -155,7 +155,7 @@ class GameState {
             normal: '#e0e0ff',
             damage: '#ff4d7a',
             heal: '#00ff88',
-            energy: '#ffd166',
+            Point: '#ffd166',
             buff: '#a78bfa',
             debuff: '#ff8e53'
         };
@@ -177,7 +177,7 @@ class GameState {
 
         this.characters.forEach(char => {
             char.currentHp = char.maxHp;
-            char.currentEnergy = 0;
+            char.currentPoint = 0;
             char.statusEffects = [];
             char.isActive = false;
         });

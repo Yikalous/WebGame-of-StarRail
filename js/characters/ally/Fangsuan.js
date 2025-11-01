@@ -9,7 +9,7 @@
         speed: 137,
         critRate: 0.4,
         critDamage: 0.8,
-        maxEnergy: 5,
+        maxPoint: 5,
         icon: "🧙",
         skills: [
             {
@@ -19,7 +19,7 @@
                 skillType: SkillType.BASIC,
                 tags: [SkillTag.ATTACK, SkillTag.SINGLE_TARGET],
                 icon: "⚔️",
-                energyCost: -1,
+                PointCost: -3,
                 executeFunc: function (user, target, allCharacters) {
                     const enemies = allCharacters.filter(c => c.type === 'enemy' && c.currentHp > 0);
                     const actualTarget = target || (enemies.length > 0 ? enemies[0] : null);
@@ -32,18 +32,6 @@
                 }
             },
             {
-                name: "圣灵之怒",
-                description: "对所有敌方造成量子伤害",
-                targetType: TargetType.ALL_ENEMIES,
-                skillType: SkillType.SKILL,
-                tags: [SkillTag.ATTACK, SkillTag.AOE],
-                icon: "✨",
-                energyCost: 0,
-                executeFunc: function (user, target, allCharacters) {
-                    user.Attack("AOE", "attack", [300], [2.0], null, DamageType.QUANTUM);
-                }
-            },
-            {
                 name: "死之剑",
                 description: "前劈宝剑，发出剑气",
                 targetType: TargetType.ALL_ENEMIES,
@@ -53,15 +41,16 @@
                 filter: function (user, target, allCharacters) {  // 修正为3个参数
                     return user.hasStatusEffect("无敌之王的加冕");
                 },
-                energyCost: 0,
+                PointCost: 0,
                 executeFunc: function (user, target, allCharacters) {
-                    user.Attack("AOE", "attack", [300], [200.0], null, DamageType.QUANTUM);
+
+                    user.Attack("AOE", "attack", [700], [2.0], null, DamageType.QUANTUM);
                 }
             },
             {
                 name: "终结技 - 生死别离",
                 description: "自身获得无敌，敌方全体受到伤害提升",
-                energyCost: 3,
+                PointCost: 3,
                 targetType: TargetType.ALL,
                 skillType: SkillType.ULTIMATE,
                 tags: [SkillTag.BUFF, SkillTag.DEBUFF, SkillTag.FIELD],
@@ -69,10 +58,11 @@
                 executeFunc: function (user, target, allCharacters) {
                     // 使用完善后的 addStatusEffect 方法
                     user.addStatusEffect("无敌之王的加冕", "immune", true, 3, 'self', 'end');
+                    user.addStatusEffect("圣剑的祝福", "damageBonus", 15, 3, 'self', 'end');
 
                     allCharacters.forEach(c => {
                         if (c.type === 'enemy') {
-                            c.addStatusEffect("死之剑的诅咒", "damageTakenBonus", 0.2, 3, 'self', 'end');
+                            c.addStatusEffect("死之剑的诅咒", "damageTakenBonus", 1.0, 3, 'self', 'end');
                         }
                     });
 

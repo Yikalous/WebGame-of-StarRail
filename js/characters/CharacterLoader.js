@@ -35,7 +35,7 @@ class CharacterLoader {
                 skills.push(new Skill(
                     skillConfig.name,
                     skillConfig.description,
-                    skillConfig.energyCost || 0,
+                    skillConfig.PointCost || 0,
                     skillConfig.targetType,
                     skillConfig.skillType,
                     skillConfig.damageType || DamageType.PHYSICAL,
@@ -58,7 +58,7 @@ class CharacterLoader {
             template.speed || 100,
             template.critRate,
             template.critDamage,
-            template.maxEnergy,
+            template.maxPoint,
             skills,
             template.icon
         );

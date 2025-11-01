@@ -1,9 +1,9 @@
 class Skill {
-    constructor(name, description, energyCost, targetType, skillType,
+    constructor(name, description, PointCost, targetType, skillType,
         damageType = DamageType.PHYSICAL, tags = [], icon = "🔮", executeFunc = null, filter = null) {  // 添加 filter 参数
         this.name = name;
         this.description = description;
-        this.energyCost = energyCost || 0;
+        this.PointCost = PointCost || 0;
         this.targetType = targetType;
         this.skillType = skillType;
         this.damageType = damageType;

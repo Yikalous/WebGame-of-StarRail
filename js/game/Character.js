@@ -1,5 +1,5 @@
 class Character {
-    constructor(name, type, maxHp, attack, defense, speed, critRate, critDamage, maxEnergy, skills, icon = "🚀", level = 80) {
+    constructor(name, type, maxHp, attack, defense, speed, critRate, critDamage, maxPoint, skills, icon = "🚀", level = 80) {
         this.name = name;
         this.type = type;
         this.level = level;
@@ -12,8 +12,8 @@ class Character {
         this.speed = speed;
         this.critRate = critRate;
         this.critDamage = critDamage;
-        this.maxEnergy = maxEnergy;
-        this.currentEnergy = 0;
+        this.maxPoint = maxPoint;
+        this.currentPoint = 0;
 
         // 百分比加成
         this.attackPercent = 0;          // 攻击%加成
@@ -76,13 +76,13 @@ class Character {
         });
     }
 
-    gainEnergy(amount) {
-        this.currentEnergy = Math.min(this.maxEnergy, this.currentEnergy + amount);
+    gainPoint(amount) {
+        this.currentPoint = Math.min(this.maxPoint, this.currentPoint + amount);
     }
 
-    useEnergy(amount) {
-        if (this.currentEnergy >= amount) {
-            this.currentEnergy -= amount;
+    usePoint(amount) {
+        if (this.currentPoint >= amount) {
+            this.currentPoint -= amount;
             return true;
         }
         return false;

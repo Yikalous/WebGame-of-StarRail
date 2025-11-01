@@ -6,7 +6,7 @@
         attack: 250,
         critRate: 0.2,
         critDamage: 0.5,
-        maxEnergy: 3,
+        maxPoint: 3,
         icon: "👾",
         damageResistances: {
             [DamageType.PHYSICAL]: 0.1,
@@ -27,7 +27,7 @@
             {
                 name: "能量冲击",
                 description: "对敌方单体造成雷属性伤害",
-                energyCost: 1,
+                PointCost: 1,
                 targetType: TargetType.SINGLE,
                 skillType: SkillType.SKILL,
                 tags: [SkillTag.ATTACK, SkillTag.SINGLE_TARGET],
