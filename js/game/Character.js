@@ -195,7 +195,7 @@ class Character {
                             }
                             if (effect.name === "魔力吸取" && effect.value) {
                                 // 根据造成的伤害和比例回复战技点
-                                const manasteal = Math.floor(finalDamage * effect.value);
+                                const manasteal = effect.value;
                                 if (manasteal > 0) {
                                     this.gainPoint(manasteal);
                                     this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
@@ -300,7 +300,7 @@ class Character {
                         }
                         if (effect.name === "魔力吸取" && effect.value) {
                             // BOUND攻击：根据总伤害和比例回复战技点
-                            const manasteal = Math.floor(totalBoundDamage * effect.value);
+                            const manasteal =  effect.value;
                             if (manasteal > 0) {
                                 this.gainPoint(manasteal);
                                 this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
@@ -383,7 +383,7 @@ class Character {
                         }
                         if (effect.name === "魔力吸取" && effect.value) {
                             // SPREAD攻击：根据总伤害和比例回复战技点
-                            const manasteal = Math.floor(totalSpreadDamage * effect.value);
+                            const manasteal =  effect.value;
                             if (manasteal > 0) {
                                 this.gainPoint(manasteal);
                                 this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
