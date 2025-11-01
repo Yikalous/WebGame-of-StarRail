@@ -377,6 +377,7 @@ class UIManager {
 
         this.selectedSkill = null; // 清除选中的技能
         this.gameState.checkGameEnd();
+        
         this.updateUI();
 
         // 正常情况：切换到下一个回合

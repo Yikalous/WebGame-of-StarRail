@@ -397,6 +397,8 @@ class Character {
             default:
                 console.warn(`未知的攻击类型: ${type}`);
         }
+        
+
     }
 
     getAdjacentTargets(enemies, mainIndex) {

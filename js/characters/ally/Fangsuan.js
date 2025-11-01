@@ -17,6 +17,7 @@
                 description: "对敌方主目标造成量子伤害",
                 targetType: TargetType.SINGLE,
                 skillType: SkillType.BASIC,
+                damageType: DamageType.QUANTUM,
                 tags: [SkillTag.ATTACK, SkillTag.SINGLE_TARGET],
                 icon: "⚔️",
                 PointCost: -3,
@@ -60,6 +61,7 @@
                 PointCost: 3,
                 targetType: TargetType.ALL,
                 skillType: SkillType.ULTIMATE,
+                damageType: DamageType.PURE,  // 终结技不造成伤害，使用纯粹类型
                 tags: [SkillTag.BUFF, SkillTag.DEBUFF, SkillTag.FIELD],
                 icon: "💫",
                 executeFunc: function (user, target, allCharacters) {
