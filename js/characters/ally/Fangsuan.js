@@ -25,7 +25,7 @@
                     const actualTarget = target || (enemies.length > 0 ? enemies[0] : null);
 
                     if (actualTarget) {
-                        user.Attack("SINGLE", "attack", [1100, 1400], [3.0, 2.0], actualTarget, DamageType.QUANTUM);
+                        user.Attack("SINGLE", "attack", [1100], [3.0], actualTarget, DamageType.QUANTUM);
                     } else {
                         user.Log("没有可攻击的目标", 'debuff');
                     }
