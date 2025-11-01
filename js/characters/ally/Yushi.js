@@ -59,7 +59,7 @@
                     // 获取或创建叠加层数标记
                     let stackEffect = user.statusEffects.find(e => e.name === "火翼的拥抱叠加");
                     if (!stackEffect) {
-                        stackEffect = new StatusEffect("火翼的拥抱叠加", 999);
+                        stackEffect = new StatusEffect("火翼的拥抱叠加", 5);
                         stackEffect.turnType = 'self';
                         stackEffect.triggerTime = 'end';
                         stackEffect.owner = user;
@@ -71,11 +71,8 @@
                     let currentStacks = Math.min(stackEffect.value || 0, maxStacks);
                     
                     // 基础攻击次数为3次
-                    let attackCount = 3;
                     
-                    // 连续进行三次攻击
-                    for (let i = 0; i < 3; i++) {
-                        user.Log(`--- 第${i + 1}次攻击 ---`, 'buff');
+
                         
                         // 标记不会死亡（临时状态）
                         const wasImmuneDeath = user.statusEffects.some(e => e.isImmuneDeath);
@@ -90,28 +87,44 @@
                         
                         // 累计本回合造成的总伤害（用于生命吸取）
                         let totalDamageThisRound = 0;
+                        // 记录本轮的实际扣血量（用于叠加检查）
+                        let actualSelfDamage = 0;
                         
                         // 对每个目标执行效果
-                        targets.forEach(tgt => {
-                            if (tgt.type === 'enemy') {
-                                // 对敌人：造成150%攻击力伤害
-                                const damage = user.getActualAttack() * 1.5;
-                                const finalDamage = user.calculateDamage(damage, DamageType.FIRE, SkillType.SKILL, tgt);
-                                tgt.takeDamage(finalDamage, DamageType.FIRE, user);
-                                totalDamageThisRound += finalDamage;
-                                user.Log(`${user.name} 对 ${tgt.name} 造成 ${Math.floor(finalDamage)} 点火属性伤害`, 'damage');
-                            } else if (tgt.type === 'ally') {
-                                // 对友方：回复5%生命上限的血量
-                                const healAmount = Math.floor(tgt.maxHp * 0.05);
-                                const oldHp = tgt.currentHp;
-                                tgt.currentHp = Math.min(tgt.maxHp, tgt.currentHp + healAmount);
-                                if (tgt.currentHp > oldHp) {
-                                    user.Log(`${user.name} 为 ${tgt.name} 回复 ${healAmount} 点生命`, 'heal');
-                                }
-                            }
-                        });
                         
-                        // 处理生命吸取和魔力吸取效果（基于本轮造成的总伤害）
+                        // 这里要循环三次
+                        for (let j = 0; j < 3; j++) {
+                            targets.forEach(tgt => {
+                                if (tgt.type === 'enemy') {
+                                    // 对敌人：造成150%攻击力伤害
+                                    const damage = user.getActualAttack() * 1.5;
+                                    const finalDamage = user.calculateDamage(damage, DamageType.FIRE, SkillType.SKILL, tgt);
+                                    tgt.takeDamage(finalDamage, DamageType.FIRE, user);
+                                    totalDamageThisRound += finalDamage;
+                                    user.Log(`${user.name} 对 ${tgt.name} 造成 ${Math.floor(finalDamage)} 点火属性伤害（第${j + 1}次）`, 'damage');
+                                } else if (tgt.type === 'ally') {
+                                    // 对友方：回复5%生命上限的血量
+                                    const healAmount = Math.floor(tgt.maxHp * 0.05);
+                                    const oldHp = tgt.currentHp;
+                                    tgt.currentHp = Math.min(tgt.maxHp, tgt.currentHp + healAmount);
+                                    if (tgt.currentHp > oldHp) {
+                                        user.Log(`${user.name} 为 ${tgt.name} 回复 ${healAmount} 点生命（第${j + 1}次）`, 'heal');
+                                    }
+                                }
+                            });
+
+                            // 对自身造成34%生命上限伤害（火衣触发扣血，在生命吸血前）
+                            // 使用 DamageType.PURE 确保不受防御和伤害减免影响，并能触发"眼的回想"
+                            const selfDamage = Math.floor(user.maxHp * 0.34);
+                            const oldHp = user.currentHp;
+                            // 使用 takeDamage 方法以便触发"眼的回想"检查
+                            user.takeDamage(selfDamage, DamageType.PURE, user);
+                            const newHp = user.currentHp;
+                            actualSelfDamage = oldHp - newHp; // 更新外层循环的变量
+                            user.Log(`${user.name} 因火翼的拥抱受到 ${actualSelfDamage} 点真实伤害（第${j + 1}次）`, 'damage');
+                        }
+                        
+                        // 处理生命吸取和魔力吸取效果（基于本轮造成的总伤害，在扣血后执行）
                         if (totalDamageThisRound > 0) {
                             user.statusEffects.forEach(effect => {
                                 if (effect.name === "生命吸取" && effect.value) {
@@ -132,13 +145,6 @@
                             });
                         }
                         
-                        // 对自身造成34%生命上限伤害
-                        const selfDamage = Math.floor(user.maxHp * 0.34);
-                        const oldHp = user.currentHp;
-                        user.currentHp = Math.max(1, user.currentHp - selfDamage);
-                        const actualSelfDamage = oldHp - user.currentHp;
-                        user.Log(`${user.name} 因火翼的拥抱受到 ${actualSelfDamage} 点伤害`, 'damage');
-                        
                         // 检查是否成功造成17%生命上限的伤害（用于叠加）
                         const thresholdDamage = Math.floor(user.maxHp * 0.17);
                         if (actualSelfDamage >= thresholdDamage && currentStacks < maxStacks) {
@@ -157,7 +163,7 @@
                                 // 使用状态效果标记护盾值（每层10%生命上限）
                                 let shieldEffect = ally.statusEffects.find(e => e.name === "火翼的护盾");
                                 if (!shieldEffect) {
-                                    shieldEffect = new StatusEffect("火翼的护盾", 999);
+                                    shieldEffect = new StatusEffect("火翼的护盾", 3);
                                     shieldEffect.turnType = 'self';
                                     shieldEffect.triggerTime = 'end';
                                     shieldEffect.owner = ally;
@@ -172,12 +178,6 @@
                             
                             user.Log(`火翼的拥抱叠加至第 ${currentStacks} 层！`, 'buff');
                         }
-                        
-                        // 移除临时免疫死亡状态
-                        if (!wasImmuneDeath) {
-                            user.statusEffects = user.statusEffects.filter(e => e.name !== "火翼攻击免疫死亡");
-                        }
-                    }
                     
                     // 记录最终叠加层数
                     user.Log(`火翼的拥抱完成！当前叠加 ${currentStacks} 层`, 'buff');
@@ -185,21 +185,35 @@
             },
             {
                 name: "终结技 - 即使生命未予回应",
-                description: "释放终结技，若触发眼的回想，则下回合使自身和任意两名队友获得该隐印记",
+                description: "对敌方全体造成大量火属性伤害，若触发眼的回想，则下回合使自身和任意两名队友获得该隐印记",
                 PointCost: 3,
                 targetType: TargetType.ALL,
                 skillType: SkillType.ULTIMATE,
                 damageType: DamageType.FIRE,
-                tags: [SkillTag.BUFF, SkillTag.ULTIMATE],
+                tags: [SkillTag.ATTACK, SkillTag.BUFF, SkillTag.ULTIMATE],
                 icon: "💫",
                 executeFunc: function (user, target, allCharacters) {
                     user.Log(`${user.name} 释放终结技：即使生命未予回应！`, 'buff');
+                    
+                    // 对敌方全体造成大量火属性伤害
+                    const enemies = allCharacters.filter(c => c.type === 'enemy' && c.currentHp > 0);
+                    if (enemies.length > 0) {
+                        user.Log(`${user.name} 释放巨大的火焰冲击！`, 'damage');
+                        enemies.forEach(enemy => {
+                            // 终结技伤害：基础伤害 + 攻击力 * 5.0
+                            const baseDamage = 6000;
+                            const damage = baseDamage + user.getActualAttack() * 10.0;
+                            const finalDamage = user.calculateDamage(damage, DamageType.FIRE, SkillType.ULTIMATE, enemy);
+                            enemy.takeDamage(finalDamage, DamageType.FIRE, user);
+                            user.Log(`${user.name} 对 ${enemy.name} 造成 ${Math.floor(finalDamage)} 点巨大火属性伤害`, 'damage');
+                        });
+                    }
                     
                     // 检查是否触发眼的回想（检查被动技能）
                     if (user.passiveSkills && user.passiveSkills.eyeRecall) {
                         const eyeRecall = user.passiveSkills.eyeRecall;
                         // 检查是否在本回合触发过眼的回想
-                        const triggeredThisTurn = eyeRecall.triggeredThisTurn || false;
+                        const triggeredThisTurn = eyeRecall.used || false;
                         
                         user.Log(`检查眼的回想状态: triggeredThisTurn=${triggeredThisTurn}, used=${eyeRecall.used}`, 'normal');
                         
@@ -238,7 +252,6 @@
             // 眼的回想
             eyeRecall: {
                 used: false, // 每场战斗仅限一次
-                triggeredThisTurn: false, // 本回合是否触发
                 
                 // 在受到致死伤害时触发
                 onFatalDamage: function(yushi, allCharacters) {
@@ -247,13 +260,16 @@
                         return false;
                     }
                     
-                    // 检查所有上场队友是否全部存活
-                    const allies = allCharacters.filter(c => c.type === 'ally' && c.currentHp > 0);
-                    const allAlive = allies.length === yushi.gameState.getAllies().length;
+                    // 检查所有上场队友是否全部存活（不包括逾柿自己）
+                    const allAllies = yushi.gameState.getAllies(); // 所有初始上场的友方
+                    const aliveAllies = allAllies.filter(c => c.currentHp > 0 && c !== yushi); // 除逾柿外存活的友方
+                    const totalOtherAllies = allAllies.filter(c => c !== yushi).length; // 除逾柿外所有友方数量
+                    
+                    // 如果除逾柿外的所有队友都存活，则触发
+                    const allAlive = aliveAllies.length === totalOtherAllies && totalOtherAllies > 0;
                     
                     if (allAlive) {
                         this.used = true;
-                        this.triggeredThisTurn = true;
                         yushi.currentHp = 1;
                         yushi.Log(`${yushi.name} 的【眼的回想】触发！血量保持在1`, 'buff');
                         return true;

@@ -453,6 +453,19 @@ class Character {
         let wasImmuneDeath = false;
         
         if (isFatalDamage) {
+            // 优先检查"眼的回想"被动技能（眼的回想应该优先于免疫死亡触发）
+            if (this.passiveSkills && this.passiveSkills.eyeRecall) {
+                const eyeRecall = this.passiveSkills.eyeRecall;
+                if (eyeRecall.onFatalDamage && typeof eyeRecall.onFatalDamage === 'function') {
+                    const saved = eyeRecall.onFatalDamage(this, this.gameState ? this.gameState.characters : []);
+                    if (saved) {
+                        this.currentHp = 1;
+                        return true; // 成功触发眼的回想，保持1血
+                    }
+                }
+            }
+            
+            // 如果眼的回想没有触发，检查免疫死亡状态
             const immuneEffects = this.statusEffects.filter(e => e.isImmuneDeath);
             if (immuneEffects.length > 0) {
                 // 消耗一次免疫致命伤
@@ -467,33 +480,28 @@ class Character {
                     wasImmuneDeath = true;
                     this.Log(`${this.name} 免疫了致命伤害！`, 'buff');
                     
-                    // 免疫死亡也算触发致死伤害，检查眼的回想
-                    // 即使免疫死亡成功，也应该标记triggeredThisTurn（如果满足条件），使终结技能够触发
+                    // 免疫死亡也算触发致死伤害，标记triggeredThisTurn（如果满足条件），使终结技能够触发
+                    // 注意：此时currentHp已被设置为1，所以检查时需要考虑这一点
                     if (this.passiveSkills && this.passiveSkills.eyeRecall) {
                         const eyeRecall = this.passiveSkills.eyeRecall;
-                        // 检查队友是否全部存活（眼的回想的触发条件）
-                        const allies = (this.gameState ? this.gameState.characters : []).filter(c => c.type === 'ally' && c.currentHp > 0);
-                        const allAlive = allies.length === (this.gameState ? this.gameState.getAllies().length : 0);
-                        
-                        // 如果队友全部存活，标记triggeredThisTurn（即使used已经是true，免疫死亡也算触发）
-                        if (allAlive) {
-                            eyeRecall.triggeredThisTurn = true;
-                            this.Log(`${this.name} 免疫致命伤害，触发眼的回想标记（可用于终结技）`, 'buff');
+                        // 检查队友是否全部存活（眼的回想的触发条件，不包括自己）
+                        if (this.gameState) {
+                            const allAllies = this.gameState.getAllies(); // 所有初始上场的友方
+                            // 检查除自己外的所有友方，包括自己（因为此时自己HP=1，还活着）
+                            const aliveAllies = allAllies.filter(c => c !== this && c.currentHp > 0); // 除自己外存活的友方
+                            const totalOtherAllies = allAllies.filter(c => c !== this).length; // 除自己外所有友方数量
+                            
+                            // 如果除自己外的所有队友都存活，标记triggeredThisTurn
+                            const allAlive = aliveAllies.length === totalOtherAllies && totalOtherAllies > 0;
+                            
+                            if (allAlive) {
+                                eyeRecall.triggeredThisTurn = true;
+                                this.Log(`${this.name} 免疫致命伤害，触发眼的回想标记（可用于终结技）`, 'buff');
+                            }
                         }
                     }
                     
                     return true;
-                }
-            }
-            
-            // 检查逾柿的"眼的回想"被动技能（在没有免疫死亡的情况下）
-            if (this.passiveSkills && this.passiveSkills.eyeRecall) {
-                const eyeRecall = this.passiveSkills.eyeRecall;
-                if (eyeRecall.onFatalDamage && typeof eyeRecall.onFatalDamage === 'function') {
-                    const saved = eyeRecall.onFatalDamage(this, this.gameState ? this.gameState.characters : []);
-                    if (saved) {
-                        return true; // 成功触发眼的回想，保持1血
-                    }
                 }
             }
         }
@@ -538,6 +546,11 @@ class Character {
 
     // Character.js - 添加完整的伤害计算方法
     calculateDamage(baseDamage, damageType, skillType, target, isBreakDamage = false) {
+        // 纯粹伤害（PURE）类型：直接返回原始伤害，不受任何减免影响
+        if (damageType === DamageType.PURE) {
+            return Math.floor(baseDamage);
+        }
+
         // === 1. 基础伤害区 ===
         const baseDamageArea = baseDamage;
 

@@ -208,6 +208,7 @@ class GameState {
     // 统一的状态效果处理方法
     processStatusEffects(character, triggerTime) {
         const effectsToRemove = [];
+        const effectsToTrigger = []; // 存储需要触发特殊效果的效果
 
         character.statusEffects.forEach(effect => {
             if (effect.triggerTime === triggerTime) {
@@ -224,6 +225,11 @@ class GameState {
                 if (effect.duration <= 0) {
                     effectsToRemove.push(effect);
                     console.log(`  ${effect.name} 效果结束`);
+                    
+                    // 如果是"下回合给予该隐印记"，标记需要触发
+                    if (effect.name === "下回合给予该隐印记") {
+                        effectsToTrigger.push(effect);
+                    }
                 }
             }
         });
@@ -233,9 +239,24 @@ class GameState {
             !effectsToRemove.includes(effect)
         );
 
-        // 通知效果移除
+        // 通知效果移除并触发特殊效果
         effectsToRemove.forEach(effect => {
             this.addLog(`${character.name}的【${effect.name}】效果结束了`, 'debuff');
+            
+            // 如果移除的是"该隐印记"，同时移除相关的攻击加成
+            if (effect.name === "该隐印记") {
+                character.statusEffects = character.statusEffects.filter(e => 
+                    e.name !== "该隐印记-攻击"
+                );
+            }
+        });
+        
+        // 处理需要触发的特殊效果（在移除后触发）
+        effectsToTrigger.forEach(effect => {
+            if (effect.name === "下回合给予该隐印记") {
+                const count = effect.value || 2;
+                this.grantCainMark(character, count);
+            }
         });
         
         // 处理持续治疗效果（回合结束时）
@@ -252,24 +273,10 @@ class GameState {
                     }
                 }
                 
-                // 该隐印记：回合结束时减少一层
-                if (effect.name === "该隐印记" && effect.value) {
-                    effect.value = Math.max(0, effect.value - 1);
-                    if (effect.value <= 0) {
-                        // 移除该隐印记和相关的攻击加成
-                        character.statusEffects = character.statusEffects.filter(e => 
-                            e.name !== "该隐印记" && e.name !== "该隐印记-攻击"
-                        );
-                        this.addLog(`${character.name} 的该隐印记消失了`, 'debuff');
-                    } else {
-                        // 更新攻击力加成
-                        const attackEffect = character.statusEffects.find(e => e.name === "该隐印记-攻击");
-                        if (attackEffect) {
-                            attackEffect.attackPercent = 0.3 * effect.value;
-                        }
-                        this.addLog(`${character.name} 的该隐印记减少至 ${effect.value} 层`, 'debuff');
-                    }
-                }
+                // 该隐印记：持续时间在processStatusEffects中通过duration自动减少
+                // 当duration变为0时，会在effectsToRemove中移除
+                // 这里只需要在移除时输出日志和同步移除攻击加成
+                // （该隐印记的持续时间减少已在processStatusEffects的通用逻辑中处理）
                 
                 // 火翼的护盾处理（如果需要）
                 if (effect.name === "火翼的护盾" && effect.value) {
@@ -292,20 +299,7 @@ class GameState {
             }
         });
         
-        // 处理"下回合给予该隐印记"效果（必须在processStatusEffects之前，否则duration减少后可能被移除）
-        const markEffect = newCharacter.statusEffects.find(e => e.name === "下回合给予该隐印记");
-        if (markEffect) {
-            console.log(`处理 ${newCharacter.name} 的"下回合给予该隐印记"，value=${markEffect.value}`);
-            this.grantCainMark(newCharacter, markEffect.value || 2);
-            // 移除标记效果
-            newCharacter.statusEffects = newCharacter.statusEffects.filter(e => e !== markEffect);
-        } else {
-            // 调试：检查是否有类似的状态效果
-            const similarEffects = newCharacter.statusEffects.filter(e => e.name && e.name.includes('该隐'));
-            if (similarEffects.length > 0) {
-                console.log(`${newCharacter.name} 有相关状态效果:`, similarEffects.map(e => e.name));
-            }
-        }
+        // 不再在这里处理"下回合给予该隐印记"，改为在processStatusEffects中当buff消失时触发
 
         // 处理回合开始时的状态效果（包括减少duration和移除过期效果）
         this.handleTurnStartEffects(newCharacter);
@@ -351,27 +345,31 @@ class GameState {
             // 查找或创建该隐印记
             let cainMark = char.statusEffects.find(e => e.name === "该隐印记");
             if (!cainMark) {
-                cainMark = new StatusEffect("该隐印记", 999);
+                // 不存在，创建新的该隐印记，持续10回合
+                cainMark = new StatusEffect("该隐印记", 10);
                 cainMark.turnType = 'self';
                 cainMark.triggerTime = 'end';
                 cainMark.owner = char;
-                cainMark.value = 0; // 存储层数
+                cainMark.value = 1; // 存储层数，初始为1层
                 cainMark.appliedTurn = this.turnCount || 0;
                 char.statusEffects.push(cainMark);
+                this.addLog(`${char.name} 获得该隐印记（层数：1，攻击力+30%，持续10回合）`, 'buff');
+            } else {
+                // 已存在，累加层数并重置持续时间
+                cainMark.value = (cainMark.value || 1) + 1; // 增加层数
+                cainMark.duration = 10; // 重置持续时间为10回合
+                cainMark.appliedTurn = this.turnCount || 0; // 更新应用回合
+                this.addLog(`${char.name} 的该隐印记叠加至 ${cainMark.value} 层（攻击力+${(0.3 * cainMark.value * 100).toFixed(0)}%），持续时间重置为10回合`, 'buff');
             }
-            
-            // 增加层数
-            cainMark.value = (cainMark.value || 0) + 1;
             
             // 更新攻击力加成（根据层数）
             let attackEffect = char.statusEffects.find(e => e.name === "该隐印记-攻击");
             if (!attackEffect) {
-                char.addStatusEffect("该隐印记-攻击", "attackPercent", 0.3 * cainMark.value, 999, 'self', 'end');
+                char.addStatusEffect("该隐印记-攻击", "attackPercent", 0.3 * cainMark.value, 10, 'self', 'end');
             } else {
                 attackEffect.attackPercent = 0.3 * cainMark.value;
+                attackEffect.duration = 10; // 同时重置攻击加成的持续时间
             }
-            
-            this.addLog(`${char.name} 获得该隐印记（层数：${cainMark.value}，攻击力+${(0.3 * cainMark.value * 100).toFixed(0)}%）`, 'buff');
         });
     }
 
