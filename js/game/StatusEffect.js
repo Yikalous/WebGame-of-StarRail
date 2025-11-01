@@ -29,6 +29,7 @@ class StatusEffect {
                 // 易伤和抗性区
                 damageTakenBonus = 0,
                 vulnerability = 0,
+                damageReduction = 0, // 伤害减免
                 
                 // 抗性相关
                 resistanceReduction = {}, // {物理: 0.1, 火: 0.2}
@@ -83,6 +84,7 @@ class StatusEffect {
         // 易伤和抗性
         this.damageTakenBonus = damageTakenBonus;
         this.vulnerability = vulnerability;
+        this.damageReduction = damageReduction;
         
         // 抗性相关
         this.resistanceReduction = resistanceReduction;

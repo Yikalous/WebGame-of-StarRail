@@ -17,6 +17,7 @@
                 description: "对敌方主目标造成量子伤害",
                 targetType: TargetType.SINGLE,
                 skillType: SkillType.BASIC,
+                damageType: DamageType.QUANTUM,
                 tags: [SkillTag.ATTACK, SkillTag.SINGLE_TARGET],
                 icon: "⚔️",
                 PointCost: -3,
@@ -36,6 +37,7 @@
                 description: "前劈宝剑，发出剑气",
                 targetType: TargetType.ALL_ENEMIES,
                 skillType: SkillType.SPECIAL,
+                damageType: DamageType.QUANTUM,
                 tags: [SkillTag.ATTACK, SkillTag.AOE, SkillTag.BREAK],
                 icon: "⚰️",
                 filter: function (user, target, allCharacters) {  // 修正为3个参数
@@ -53,6 +55,7 @@
                 PointCost: 3,
                 targetType: TargetType.ALL,
                 skillType: SkillType.ULTIMATE,
+                damageType: DamageType.PURE,  // 终结技不造成伤害，使用纯粹类型
                 tags: [SkillTag.BUFF, SkillTag.DEBUFF, SkillTag.FIELD],
                 icon: "💫",
                 executeFunc: function (user, target, allCharacters) {
@@ -76,6 +79,7 @@
 
     window.registerFangsuan = function (loader) {
         loader.registerCharacterTemplate("Fangsuan", FangsuanTemplate);
-        return loader.createCharacter("Fangsuan");
+        // 不创建实例，只注册模板
+        // return loader.createCharacter("Fangsuan");
     };
 })();

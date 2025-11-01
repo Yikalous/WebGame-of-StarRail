@@ -106,6 +106,22 @@ class GameState {
         effectsToRemove.forEach(effect => {
             this.addLog(`${character.name}的【${effect.name}】效果结束了`, 'debuff');
         });
+        
+        // 处理持续治疗效果（回合结束时）
+        if (triggerTime === 'end') {
+            character.statusEffects.forEach(effect => {
+                // 骑士之道治疗效果
+                if (effect.name === "骑士之道的庇护" && effect.attackBonus) {
+                    const knightCount = effect.attackBonus; // 使用attackBonus存储骑士数量
+                    const healAmount = Math.floor(character.maxHp * 0.04 * knightCount);
+                    const oldHp = character.currentHp;
+                    character.currentHp = Math.min(character.maxHp, character.currentHp + healAmount);
+                    if (character.currentHp > oldHp) {
+                        this.addLog(`${character.name} 受到骑士之道治疗 ${healAmount} 点生命`, 'heal');
+                    }
+                }
+            });
+        }
     }
 
     // 新增方法：处理新回合开始
