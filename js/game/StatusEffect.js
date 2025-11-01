@@ -159,7 +159,8 @@ class StatusEffect {
         if (this.turnType === 'all') {
             return true;
         } else if (this.turnType === 'self') {
-            return currentCharacter.name === this.owner.name;
+            // 使用UUID进行比较，确保同名单位不会互相影响
+            return this.owner && currentCharacter.uuid === this.owner.uuid;
         }
         return true;
     }

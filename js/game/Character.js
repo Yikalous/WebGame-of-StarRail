@@ -1,5 +1,8 @@
 class Character {
     constructor(name, type, maxHp, attack, defense, speed, critRate, critDamage, maxPoint, skills, icon = "🚀", level = 80) {
+        // 生成唯一UUID
+        this.uuid = this.generateUUID();
+        
         this.name = name;
         this.type = type;
         this.level = level;
@@ -42,6 +45,20 @@ class Character {
         this.toughness = type === 'enemy' ? 100 : 0;
         this.maxToughness = type === 'enemy' ? 100 : 0;
         this.isWeaknessBroken = false;
+
+        // 速度条系统
+        this.actionValue = 0;  // 行动值（进度条），初始为0
+        this.baseSpeed = speed; // 保存基础速度
+        this.hasExtraAction = false; // 是否有额外行动标志
+    }
+
+    // 生成UUID（唯一标识符）
+    generateUUID() {
+        // 使用时间戳、随机数和计数器生成UUID
+        const timestamp = Date.now().toString(36);
+        const randomPart = Math.random().toString(36).substring(2, 9);
+        const counter = (Character.uuidCounter = (Character.uuidCounter || 0) + 1).toString(36);
+        return `${timestamp}-${randomPart}-${counter}`;
     }
 
     // 获取实际攻击力（考虑各种加成）
@@ -67,6 +84,36 @@ class Character {
         });
 
         return this.baseDefense * (1 + defenseBonus) * (1 - defenseReduction);
+    }
+
+    // 获取实际速度（考虑状态效果）
+    getActualSpeed() {
+        let totalSpeed = this.speed;
+        this.statusEffects.forEach(effect => {
+            if (effect.speedBonus) {
+                totalSpeed += effect.speedBonus;
+            }
+        });
+        return Math.max(1, totalSpeed); // 速度至少为1
+    }
+
+    // 增加行动值
+    advanceActionValue() {
+        this.actionValue += this.getActualSpeed();
+    }
+
+    // 检查是否可以行动（行动值达到500的倍数）
+    canTakeAction() {
+        return this.actionValue >= 500;
+    }
+
+    // 消耗行动（减去500）
+    consumeAction() {
+        if (this.actionValue >= 500) {
+            this.actionValue -= 500;
+            return true;
+        }
+        return false;
     }
 
     updateStatusEffects() {
@@ -137,13 +184,21 @@ class Character {
                         const critText = this.critArea > 1 ? " (暴击!)" : "";
                         this.Log(`${this.name}对${actualTarget.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
 
-                        // 生命吸取处理
+                        // 生命吸取和魔力吸取处理
                         this.statusEffects.forEach(effect => {
                             if (effect.name === "生命吸取" && effect.value) {
                                 const lifesteal = Math.floor(finalDamage * effect.value);
                                 this.currentHp = Math.min(this.maxHp, this.currentHp + lifesteal);
                                 if (lifesteal > 0) {
                                     this.Log(`${this.name} 通过生命吸取恢复 ${lifesteal} 点生命`, 'heal');
+                                }
+                            }
+                            if (effect.name === "魔力吸取" && effect.value) {
+                                // 根据造成的伤害和比例回复战技点
+                                const manasteal = Math.floor(finalDamage * effect.value);
+                                if (manasteal > 0) {
+                                    this.gainPoint(manasteal);
+                                    this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
                                 }
                             }
                         });
@@ -189,6 +244,14 @@ class Character {
                                 this.Log(`${this.name} 通过生命吸取恢复 ${lifesteal} 点生命`, 'heal');
                             }
                         }
+                        if (effect.name === "魔力吸取" && effect.value) {
+                            // AOE攻击：根据总伤害和比例回复战技点
+                            const manasteal =  effect.value;
+                            if (manasteal > 0) {
+                                this.gainPoint(manasteal);
+                                this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
+                            }
+                        }
                     });
                 }
                 break;
@@ -229,10 +292,18 @@ class Character {
                 if (totalBoundDamage > 0) {
                     this.statusEffects.forEach(effect => {
                         if (effect.name === "生命吸取" && effect.value) {
-                            const lifesteal = Math.floor(totalBoundDamage * effect.value);
+                            const lifesteal = effect.value;
                             this.currentHp = Math.min(this.maxHp, this.currentHp + lifesteal);
                             if (lifesteal > 0) {
                                 this.Log(`${this.name} 通过生命吸取恢复 ${lifesteal} 点生命`, 'heal');
+                            }
+                        }
+                        if (effect.name === "魔力吸取" && effect.value) {
+                            // BOUND攻击：根据总伤害和比例回复战技点
+                            const manasteal = Math.floor(totalBoundDamage * effect.value);
+                            if (manasteal > 0) {
+                                this.gainPoint(manasteal);
+                                this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
                             }
                         }
                     });
@@ -304,10 +375,18 @@ class Character {
                 if (totalSpreadDamage > 0) {
                     this.statusEffects.forEach(effect => {
                         if (effect.name === "生命吸取" && effect.value) {
-                            const lifesteal = Math.floor(totalSpreadDamage * effect.value);
+                            const lifesteal =  effect.value;
                             this.currentHp = Math.min(this.maxHp, this.currentHp + lifesteal);
                             if (lifesteal > 0) {
                                 this.Log(`${this.name} 通过生命吸取恢复 ${lifesteal} 点生命`, 'heal');
+                            }
+                        }
+                        if (effect.name === "魔力吸取" && effect.value) {
+                            // SPREAD攻击：根据总伤害和比例回复战技点
+                            const manasteal = Math.floor(totalSpreadDamage * effect.value);
+                            if (manasteal > 0) {
+                                this.gainPoint(manasteal);
+                                this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
                             }
                         }
                     });
@@ -318,16 +397,7 @@ class Character {
                 console.warn(`未知的攻击类型: ${type}`);
         }
         
-        // 生命吸取效果处理（在造成伤害后）
-        if (actualTarget && type !== "AOE" && type !== "BOUND") {
-            // 只对单个目标攻击处理生命吸取
-            this.statusEffects.forEach(effect => {
-                if (effect.name === "生命吸取" && effect.value) {
-                    // 注意：这里需要在Attack方法内部处理，但无法直接获取finalDamage
-                    // 所以需要在每个case中单独处理，或重构Attack方法
-                }
-            });
-        }
+
     }
 
     getAdjacentTargets(enemies, mainIndex) {

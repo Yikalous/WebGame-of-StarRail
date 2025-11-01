@@ -48,6 +48,9 @@ document.addEventListener('DOMContentLoaded', function () {
             // 确保DOM元素存在后再初始化UI系统
             // 延迟一小段时间，确保DOM已更新
             setTimeout(() => {
+                // 初始化速度条系统
+                gameState.initializeSpeedSystem();
+                
                 // 初始化UI系统
                 const uiManager = new UIManager(gameState, battleSystem);
                 uiManager.updateUI();

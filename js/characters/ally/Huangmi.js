@@ -20,7 +20,7 @@
                 damageType: DamageType.IMAGINARY,
                 tags: [SkillTag.ATTACK, SkillTag.SINGLE_TARGET],
                 icon: "⚔️",
-                PointCost: -3,
+                PointCost: -4,
                 executeFunc: function (user, target, allCharacters) {
                     const enemies = allCharacters.filter(c => c.type === 'enemy' && c.currentHp > 0);
                     const actualTarget = target || (enemies.length > 0 ? enemies[0] : null);
@@ -67,7 +67,7 @@
                     user.Log(`${user.name} 向 ${actualTarget.name} 发起决斗！`, 'buff');
                     
                     // 对目标造成物理伤害
-                    user.Attack("SINGLE", "attack", [800], [2.0], actualTarget, DamageType.PHYSICAL, 1, SkillType.SKILL);
+                    user.Attack("SINGLE", "attack", [800], [2.0], actualTarget, DamageType.IMAGINARY, 1, SkillType.SKILL);
                     
                     if (userActualSpeed > targetActualSpeed) {
                         // 速度高于敌方：立即再次行动一次，速度-10，友方最高速+10
@@ -77,8 +77,9 @@
                         user.addStatusEffect("决斗后的疲惫", "speedBonus", -10, 1, 'self', 'end');
                         
                         // 找到友方最高速单位并提速+10
+                       
                         const allies = allCharacters.filter(c => c.type === 'ally' && c.currentHp > 0 && c !== user);
-                        if (allies.length > 0) {
+                        if (allies.length > 1) {
                             // 计算所有友方的实际速度
                             const allySpeeds = allies.map(ally => {
                                 let speed = ally.speed;
@@ -96,24 +97,12 @@
                             user.Log(`${fastestAlly.name} 受到激励，速度提升10点！`, 'buff');
                         }
                         
-                        // 设置额外回合标志 - 通过延迟不进入下一回合，让当前角色保持活跃
-                        user.isActive = true;
-                        user.Log(`${user.name} 可以立即再次行动！`, 'buff');
-                        
-                        // 延迟执行，让玩家可以选择下一个行动
-                        setTimeout(() => {
-                            // 通过游戏状态标记，让当前角色保持回合
-                            if (user.gameState) {
-                                // 不进入下一回合，而是保持当前回合
-                                const currentIndex = user.gameState.currentTurnIndex;
-                                const currentChar = user.gameState.characters[currentIndex];
-                                if (currentChar === user) {
-                                    // 保持回合，不调用 nextTurn
-                                    user.gameState.addLog(`${user.name} 获得额外行动机会`, 'buff');
-                                }
-                            }
-                        }, 500);
-                        
+                        // 标记获得额外行动（使用标志而不是立即修改actionValue）
+                        if (!user.hasExtraAction) {
+                            user.hasExtraAction = true; // 设置额外行动标志
+                            user.Log(`${user.name} 获得额外行动机会！`, 'buff');
+                        }
+                       
                     } else {
                         // 速度低于敌方：50%概率眩晕敌方
                         const shouldStun = Math.random() < 0.5;
@@ -174,10 +163,14 @@
                         ally.currentHp = Math.floor(finalMaxHp * hpPercent);
                         
                         // 添加状态效果标记，持续2回合（使用已存在的类型作为标记）
-                        ally.addStatusEffect("荣耀的统一", "damageBonus", 0, 2, 'self', 'end');
+                        ally.addStatusEffect("荣耀的统一", "damageBonus", 0, 5, 'self', 'end');
                     });
                     
                     user.Log(`所有友方的攻击力统一为 ${finalAttack}，生命上限统一为 ${finalMaxHp}${hasFangsuan ? '（钫酸加成）' : ''}`, 'buff');
+                    
+                    // 获得立即行动机会
+                    user.hasExtraAction = true;
+                    user.Log(`${user.name} 获得立即行动机会！`, 'buff');
                     
                     // 3. 检测骑士数量并激活[骑士之道]效果
                     // 假设"骑士"是指名字包含"骑士"或特定角色
@@ -187,13 +180,13 @@
                         ally.name === "荒弥"
                     );
                     
-                    if (knights.length >= 2) {
+                    if (knights.length >= 1) {
                         user.Log(`[骑士之道]激活！检测到 ${knights.length} 名骑士`, 'buff');
                         
                         // 基础效果：持续治疗和伤害减免
                         allies.forEach(ally => {
                             // 创建持续治疗效果（使用attackBonus存储骑士数量，用于治疗计算）
-                            const effect = new StatusEffect("骑士之道的庇护", 2);
+                            const effect = new StatusEffect("骑士之道的庇护", 5);
                             effect.turnType = 'self';
                             effect.triggerTime = 'end';
                             effect.owner = ally;
@@ -203,7 +196,7 @@
                             
                             // 伤害减免（每人5%）
                             const damageReduction = knights.length * 0.05;
-                            const reductionEffect = new StatusEffect("骑士之道的坚韧", 2);
+                            const reductionEffect = new StatusEffect("骑士之道的坚韧", 5);
                             reductionEffect.turnType = 'self';
                             reductionEffect.triggerTime = 'end';
                             reductionEffect.owner = ally;
@@ -224,7 +217,7 @@
                                 
                                 // 魔力吸取和生命吸取（30%）
                                 // 使用自定义状态效果存储值
-                                const lifestealEffect = new StatusEffect("生命吸取", 999);
+                                const lifestealEffect = new StatusEffect("生命吸取", 5);
                                 lifestealEffect.turnType = 'self';
                                 lifestealEffect.triggerTime = 'end';
                                 lifestealEffect.owner = ally;
@@ -232,15 +225,31 @@
                                 lifestealEffect.appliedTurn = user.gameState?.turnCount || 0;
                                 ally.statusEffects.push(lifestealEffect);
                                 
-                                const manastealEffect = new StatusEffect("魔力吸取", 999);
+                                const manastealEffect = new StatusEffect("魔力吸取", 5);
                                 manastealEffect.turnType = 'self';
                                 manastealEffect.triggerTime = 'end';
                                 manastealEffect.owner = ally;
                                 manastealEffect.value = 0.3; // 存储魔力吸取比例
                                 manastealEffect.appliedTurn = user.gameState?.turnCount || 0;
                                 ally.statusEffects.push(manastealEffect);
-                            });
-                        }
+                            }
+                        );}
+                        else {const lifestealEffect = new StatusEffect("生命吸取", 5);
+                            lifestealEffect.turnType = 'self';
+                            lifestealEffect.triggerTime = 'end';
+                            lifestealEffect.owner = ally;
+                            lifestealEffect.value = 0.5; // 存储生命吸取比例
+                            lifestealEffect.appliedTurn = user.gameState?.turnCount || 0;
+                            user.statusEffects.push(lifestealEffect);
+                            
+                            const manastealEffect = new StatusEffect("魔力吸取", 5);
+                            manastealEffect.turnType = 'self';
+                            manastealEffect.triggerTime = 'end';
+                            manastealEffect.owner = ally;
+                            manastealEffect.value = 1; // 存储魔力吸取比例
+                            manastealEffect.appliedTurn = user.gameState?.turnCount || 0;
+                            user.statusEffects.push(manastealEffect);}
+                        
                     }
                 }
             },

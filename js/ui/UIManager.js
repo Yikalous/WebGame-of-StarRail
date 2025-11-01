@@ -25,6 +25,7 @@ class UIManager {
     }
 
     updateUI() {
+        this.updateSpeedTrack();
         this.updateCharacterDisplay();
         this.updateCurrentTurn();
         this.updateSkillPanel();
@@ -37,6 +38,122 @@ class UIManager {
                 this.executeEnemyTurn();
             }
         }
+    }
+
+    // 更新统一的速度条显示
+    updateSpeedTrack() {
+        const speedTrack = document.getElementById('speed-track');
+        const speedTrackMarkers = document.getElementById('speed-track-markers');
+        
+        if (!speedTrack) {
+            console.warn('速度条元素 speed-track 未找到');
+            return;
+        }
+        
+        if (!speedTrackMarkers) {
+            console.warn('速度条标记容器 speed-track-markers 未找到');
+            return;
+        }
+
+        // 获取所有存活角色
+        const aliveCharacters = this.gameState.getAliveCharacters();
+        
+        if (aliveCharacters.length === 0) {
+            speedTrackMarkers.innerHTML = '';
+            console.log('没有存活的角色，速度条为空');
+            return;
+        }
+        
+        // 速度条长度为500，显示角色在0-500范围内的位置（使用模运算）
+        const TRACK_LENGTH = 500;
+
+        // 使用Map来跟踪现有标记，避免重新创建元素
+        const existingMarkers = new Map();
+        Array.from(speedTrackMarkers.children).forEach(marker => {
+            const uuid = marker.getAttribute('data-uuid');
+            if (uuid) {
+                existingMarkers.set(uuid, marker);
+            }
+        });
+
+        aliveCharacters.forEach(character => {
+            // 确保 actionValue 存在
+            if (typeof character.actionValue === 'undefined') {
+                character.actionValue = 0;
+            }
+            
+            // 计算角色在当前500段内的位置（0-100%）
+            const currentSegmentValue = character.actionValue % TRACK_LENGTH;
+            const position = Math.min(100, (currentSegmentValue / TRACK_LENGTH) * 100);
+            
+            // 计算已经完成的圈数
+            const completedLaps = Math.floor(character.actionValue / TRACK_LENGTH);
+            
+            // 检查是否可以行动
+            const canTakeAction = character.canTakeAction && character.canTakeAction();
+            
+            // 尝试获取现有标记，如果不存在则创建新的
+            let marker = existingMarkers.get(character.uuid);
+            
+            if (!marker) {
+                // 创建新标记
+                marker = document.createElement('div');
+                marker.className = `speed-track-marker ${character.type}`;
+                marker.setAttribute('data-character', character.name);
+                marker.setAttribute('data-uuid', character.uuid);
+
+                // 创建角色图标
+                const icon = document.createElement('div');
+                icon.className = 'speed-marker-icon';
+                icon.textContent = character.icon || '🚀';
+
+                // 创建角色名称标签
+                const label = document.createElement('div');
+                label.className = 'speed-marker-label';
+                label.textContent = character.name || '未知';
+
+                marker.appendChild(icon);
+                marker.appendChild(label);
+                speedTrackMarkers.appendChild(marker);
+                
+                // 初始位置设置（无动画）
+                marker.style.transition = 'none';
+                marker.style.left = `${position}%`;
+                // 强制重排以应用初始位置
+                marker.offsetHeight;
+                // 恢复动画
+                marker.style.transition = '';
+            } else {
+                // 更新现有标记
+                existingMarkers.delete(character.uuid);
+            }
+            
+            // 更新标记的样式和类
+            const classes = [`speed-track-marker`, character.type];
+            if (character.isActive) classes.push('active');
+            if (canTakeAction) classes.push('ready');
+            marker.className = classes.join(' ');
+            
+            // 使用requestAnimationFrame确保平滑更新
+            requestAnimationFrame(() => {
+                marker.style.left = `${position}%`;
+            });
+            
+            const actualSpeed = character.getActualSpeed ? character.getActualSpeed() : (character.speed || 0);
+            marker.title = `${character.name}\n行动值: ${Math.floor(character.actionValue)}\n当前段: ${Math.floor(currentSegmentValue)}/500\n已完成圈数: ${completedLaps}\n速度: ${actualSpeed}`;
+        });
+        
+        // 移除不再存在的标记（角色已死亡或离开）
+        existingMarkers.forEach(marker => {
+            marker.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            marker.style.opacity = '0';
+            marker.style.transform = 'translateX(-50%) scale(0.8)';
+            setTimeout(() => {
+                if (marker.parentNode) {
+                    marker.parentNode.removeChild(marker);
+                }
+            }, 300);
+        });
     }
 
     executeEnemyTurn() {
@@ -220,6 +337,7 @@ class UIManager {
         this.gameState.checkGameEnd();
         this.updateUI();
 
+        // 正常情况：切换到下一个回合
         if (!allSurvived) {
             setTimeout(() => {
                 this.continueToNextTurn();
@@ -259,8 +377,10 @@ class UIManager {
 
         this.selectedSkill = null; // 清除选中的技能
         this.gameState.checkGameEnd();
+        
         this.updateUI();
 
+        // 正常情况：切换到下一个回合
         if (!allSurvived) {
             setTimeout(() => {
                 this.continueToNextTurn();

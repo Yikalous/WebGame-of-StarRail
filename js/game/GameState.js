@@ -8,6 +8,8 @@ class GameState {
         this.selectedSkill = null;
         this.selectedTarget = null;
         this.isPlayerTurn = true;
+        this.actionQueue = []; // 行动队列（按优先级排序）
+        this.SPEED_TRACK_LENGTH = 500; // 速度条长度
     }
 
     addCharacter(character) {
@@ -27,39 +29,163 @@ class GameState {
         return this.characters.filter(char => char.currentHp > 0);
     }
 
-    // 修复 nextTurn 方法
+    // 初始化速度条系统
+    initializeSpeedSystem() {
+        // 初始化所有角色的行动值
+        this.characters.forEach(char => {
+            if (char.currentHp > 0) {
+                char.actionValue = 0;
+            }
+        });
+        
+        // 构建初始行动队列（按速度排序）
+        this.updateActionQueue();
+        
+        // 推进角色直到至少有一个角色可以行动
+        let iterations = 0;
+        const maxIterations = 1000;
+        while (this.actionQueue.length > 0 && !this.getNextCharacter() && iterations < maxIterations) {
+            this.advanceAllCharacters();
+            iterations++;
+        }
+    }
+
+    // 更新行动队列（按行动值排序，行动值高的在前）
+    updateActionQueue() {
+        const aliveCharacters = this.getAliveCharacters();
+        
+        // 按行动值降序排序，行动值相同则按速度降序
+        this.actionQueue = aliveCharacters.slice().sort((a, b) => {
+            if (b.actionValue !== a.actionValue) {
+                return b.actionValue - a.actionValue;
+            }
+            return b.getActualSpeed() - a.getActualSpeed();
+        });
+        
+        console.log('行动队列更新:', this.actionQueue.map(c => ({
+            name: c.name,
+            actionValue: c.actionValue,
+            speed: c.getActualSpeed()
+        })));
+    }
+
+    // 推进所有角色的行动值
+    advanceAllCharacters() {
+        this.characters.forEach(char => {
+            if (char.currentHp > 0) {
+                char.advanceActionValue();
+            }
+        });
+        
+        // 更新行动队列
+        this.updateActionQueue();
+    }
+
+    // 获取下一个应该行动的角色
+    getNextCharacter() {
+        // 找到第一个行动值达到500的倍数的角色
+        for (let char of this.actionQueue) {
+            if (char.canTakeAction()) {
+                return char;
+            }
+        }
+        return null;
+    }
+
+    // 插入角色到行动队列（用于额外行动等效果）
+    insertIntoActionQueue(character, actionValue = null) {
+        if (actionValue === null) {
+            // 如果不指定行动值，设置为当前最高行动值
+            if (this.actionQueue.length > 0) {
+                actionValue = this.actionQueue[0].actionValue;
+            } else {
+                actionValue = this.SPEED_TRACK_LENGTH;
+            }
+        }
+        
+        character.actionValue = actionValue;
+        this.updateActionQueue();
+    }
+
     nextTurn() {
-        if (this.isGameOver) return;
+        if (this.isGameOver) return false;
 
-        const currentCharacter = this.characters[this.currentTurnIndex];
+        // 获取当前行动角色（如果有）
+        let currentCharacter = null;
+        const currentIndex = this.characters.findIndex(c => c.isActive);
+        if (currentIndex >= 0) {
+            currentCharacter = this.characters[currentIndex];
+        }
 
-        console.log(`=== ${currentCharacter.name} 的回合结束 ===`);
+        // 如果有当前行动角色，处理回合结束
+        if (currentCharacter) {
+            console.log(`=== ${currentCharacter.name} 的回合结束 ===`);
+            
+            // 处理回合开始前效果
+            this.handleTurnStartEffects(currentCharacter);
+            
+            // 处理回合结束后效果
+            this.handleTurnEndEffects(currentCharacter);
+            
+            // 消耗行动值（减去500）
+            currentCharacter.consumeAction();
+            
+            // 检查是否有额外行动
+            if (currentCharacter.hasExtraAction) {
+                // 清除额外行动标志
+                currentCharacter.hasExtraAction = false;
+                // 设置行动值为500，确保可以立即行动
+                currentCharacter.actionValue = 500;
+                // 保持角色活跃状态
+                currentCharacter.isActive = true;
+                // 不推进角色，直接返回当前角色
+                console.log(`=== ${currentCharacter.name} 获得额外行动，继续行动 ===`);
+                return currentCharacter.type === 'ally';
+            }
+            
+            // 标记角色非活跃
+            currentCharacter.isActive = false;
+        }
 
-        // 1. 处理回合开始前效果（如果有的话）
-        this.handleTurnStartEffects(currentCharacter);
+        // 推进所有角色的行动值
+        this.advanceAllCharacters();
 
-        // 2. 标记角色非活跃
-        currentCharacter.isActive = false;
+        // 获取下一个应该行动的角色
+        let nextCharacter = this.getNextCharacter();
+        
+        // 如果没有角色达到行动值，继续推进直到有人达到
+        let iterations = 0;
+        const maxIterations = 1000; // 防止无限循环
+        while (!nextCharacter && iterations < maxIterations) {
+            this.advanceAllCharacters();
+            nextCharacter = this.getNextCharacter();
+            iterations++;
+        }
 
-        // 4. 处理回合结束后效果
-        this.handleTurnEndEffects(currentCharacter);
+        if (!nextCharacter) {
+            console.error('无法找到下一个行动角色');
+            return false;
+        }
 
-        // 5. 移动到下一个角色
-        this.moveToNextAliveCharacter();
+        // 找到下一个角色的索引
+        const nextIndex = this.characters.findIndex(c => c === nextCharacter);
+        if (nextIndex < 0) {
+            console.error('无法找到角色索引');
+            return false;
+        }
 
+        this.currentTurnIndex = nextIndex;
         this.turnCount++;
+        this.isPlayerTurn = nextCharacter.type === 'ally';
 
-        const newCharacter = this.characters[this.currentTurnIndex];
-        this.isPlayerTurn = newCharacter.type === 'ally';
-
-        // 6. 重置选择
+        // 重置选择
         this.selectedSkill = null;
         this.selectedTarget = null;
 
-        console.log(`=== ${newCharacter.name} 的回合开始 ===`);
+        console.log(`=== ${nextCharacter.name} 的回合开始 (行动值: ${nextCharacter.actionValue.toFixed(1)}, 速度: ${nextCharacter.getActualSpeed()}) ===`);
 
-        // 7. 处理新回合开始
-        this.handleNewTurnStart(newCharacter);
+        // 处理新回合开始
+        this.handleNewTurnStart(nextCharacter);
 
         return this.isPlayerTurn;
     }
@@ -196,10 +322,38 @@ class GameState {
             char.currentPoint = 0;
             char.statusEffects = [];
             char.isActive = false;
+            char.actionValue = 0; // 重置行动值
         });
 
-        if (this.characters.length > 0) {
-            this.characters[0].isActive = true;
+        // 初始化速度条系统
+        this.initializeSpeedSystem();
+        
+        // 设置第一个行动的角色
+        let firstCharacter = this.getNextCharacter();
+        if (firstCharacter) {
+            const firstIndex = this.characters.findIndex(c => c === firstCharacter);
+            if (firstIndex >= 0) {
+                this.currentTurnIndex = firstIndex;
+                this.isPlayerTurn = firstCharacter.type === 'ally';
+                firstCharacter.isActive = true;
+            }
+        } else if (this.characters.length > 0) {
+            // 如果没有角色达到行动值，推进直到有人达到
+            let iterations = 0;
+            while (!firstCharacter && iterations < 100) {
+                this.advanceAllCharacters();
+                firstCharacter = this.getNextCharacter();
+                if (firstCharacter) {
+                    const idx = this.characters.findIndex(c => c === firstCharacter);
+                    if (idx >= 0) {
+                        this.currentTurnIndex = idx;
+                        this.isPlayerTurn = firstCharacter.type === 'ally';
+                        firstCharacter.isActive = true;
+                        break;
+                    }
+                }
+                iterations++;
+            }
         }
     }
 }
