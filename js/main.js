@@ -1,7 +1,7 @@
 // 主程序入口
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log('游戏初始化开始...');
-    
+
     try {
         // 基础系统初始化
         const gameState = new GameState();
@@ -9,24 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const battleSystem = new BattleSystem(gameState);
         const characterLoader = new CharacterLoader(skillExecutor);
 
-        // 注册角色模板并创建角色实例
-        const characters = [];
-
-        // 🧙 盟友角色
-        const fangsuan = registerFangsuan(characterLoader);
-        const trailblazer = registerTrailblazer(characterLoader);
-        const silverWolf = registerSilverWolf(characterLoader);
-
-        characters.push(fangsuan, trailblazer, silverWolf);
-
-        // 👾 敌方角色
-        const enemy1 = registerAntimatterLegion(characterLoader);
-        const enemy2 = registerAntimatterLegion(characterLoader);
-        const enemy3 = registerAntimatterLegion(characterLoader);
-
-        characters.push(enemy1, enemy2, enemy3);
-
-        // 加入游戏状态
+        const characters = window.registerAllCharacters(characterLoader);
         characters.forEach(character => {
             if (character) gameState.addCharacter(character);
         });

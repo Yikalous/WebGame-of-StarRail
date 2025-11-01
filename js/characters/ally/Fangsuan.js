@@ -1,84 +1,91 @@
-(function() {
+(function () {
+    // ===== 角色模板 =====
     const FangsuanTemplate = {
         name: "钫酸",
         type: "ally",
         maxHp: 4213,
         attack: 4337,
+        defense: 1200,
+        speed: 137,
         critRate: 0.4,
         critDamage: 0.8,
         maxEnergy: 5,
         icon: "🧙",
-        damageResistances: {
-            [DamageType.QUANTUM]: 0.3,
-            [DamageType.IMAGINARY]: 0.2
-        },
         skills: [
             {
                 name: "普通攻击",
-                description: "对敌方单体造成100%攻击力的量子伤害",
-                energyCost: 0,
+                description: "对敌方主目标造成量子伤害",
                 targetType: TargetType.SINGLE,
                 skillType: SkillType.BASIC,
-                damageType: DamageType.QUANTUM,
                 tags: [SkillTag.ATTACK, SkillTag.SINGLE_TARGET],
                 icon: "⚔️",
-                executeFunc: "basicAttack"
+                energyCost: -1,
+                executeFunc: function (user, target, allCharacters) {
+                    const enemies = allCharacters.filter(c => c.type === 'enemy' && c.currentHp > 0);
+                    const actualTarget = target || (enemies.length > 0 ? enemies[0] : null);
+
+                    if (actualTarget) {
+                        user.Attack("SINGLE", "attack", [1100, 1400], [3.0, 2.0], actualTarget, DamageType.QUANTUM);
+                    } else {
+                        user.Log("没有可攻击的目标", 'debuff');
+                    }
+                }
             },
             {
-                name: "战技",
-                description: "对敌方全体造成200%攻击力的量子伤害",
-                energyCost: 1,
+                name: "圣灵之怒",
+                description: "对所有敌方造成量子伤害",
                 targetType: TargetType.ALL_ENEMIES,
                 skillType: SkillType.SKILL,
-                damageType: DamageType.QUANTUM,
                 tags: [SkillTag.ATTACK, SkillTag.AOE],
                 icon: "✨",
-                executeFunc: "fangsuSkill"
-            },
-            {
-                name: "终结技 - 生死别离",
-                description: "召唤宝剑，提供强大增益和减益效果",
-                energyCost: 3,
-                targetType: TargetType.ALL,
-                skillType: SkillType.ULTIMATE,
-                damageType: DamageType.PURE,
-                tags: [SkillTag.BUFF, SkillTag.DEBUFF, SkillTag.FIELD],
-                icon: "💫",
-                executeFunc: "fangsuUltimate"
+                energyCost: 0,
+                executeFunc: function (user, target, allCharacters) {
+                    user.Attack("AOE", "attack", [300], [2.0], null, DamageType.QUANTUM);
+                }
             },
             {
                 name: "死之剑",
-                description: "前劈宝剑，发出无敌贯穿剑气",
-                energyCost: 0,
+                description: "前劈宝剑，发出剑气",
                 targetType: TargetType.ALL_ENEMIES,
                 skillType: SkillType.SPECIAL,
-                damageType: DamageType.PURE,
                 tags: [SkillTag.ATTACK, SkillTag.AOE, SkillTag.BREAK],
                 icon: "⚰️",
-                executeFunc: "fangsuDeathSword"
-            }
+                filter: function (user, target, allCharacters) {  // 修正为3个参数
+                    return user.hasStatusEffect("无敌之王的加冕");
+                },
+                energyCost: 0,
+                executeFunc: function (user, target, allCharacters) {
+                    user.Attack("AOE", "attack", [300], [200.0], null, DamageType.QUANTUM);
+                }
+            },
+            {
+                name: "终结技 - 生死别离",
+                description: "自身获得无敌，敌方全体受到伤害提升",
+                energyCost: 3,
+                targetType: TargetType.ALL,
+                skillType: SkillType.ULTIMATE,
+                tags: [SkillTag.BUFF, SkillTag.DEBUFF, SkillTag.FIELD],
+                icon: "💫",
+                executeFunc: function (user, target, allCharacters) {
+                    // 使用完善后的 addStatusEffect 方法
+                    user.addStatusEffect("无敌之王的加冕", "immune", true, 3, 'self', 'end');
+
+                    allCharacters.forEach(c => {
+                        if (c.type === 'enemy') {
+                            c.addStatusEffect("死之剑的诅咒", "damageTakenBonus", 0.2, 3, 'self', 'end');
+                        }
+                    });
+
+                    user.Log(`${user.name} 释放终结技：生死别离！`, 'buff');
+                }
+            },
         ]
     };
 
     window.FangsuanTemplate = FangsuanTemplate;
 
-    window.registerFangsuan = function(loader) {
+    window.registerFangsuan = function (loader) {
         loader.registerCharacterTemplate("Fangsuan", FangsuanTemplate);
-        const character = loader.createCharacter("Fangsuan");
-
-        const followUp = new Skill(
-            "剑意追击",
-            "宝剑引导的追加攻击，造成80%攻击力的量子伤害",
-            0,
-            TargetType.SINGLE,
-            SkillType.SPECIAL,
-            DamageType.QUANTUM,
-            [SkillTag.ATTACK, SkillTag.SINGLE_TARGET, SkillTag.FOLLOW_UP],
-            "⚔️",
-            loader.skillExecutor.getSkillFunction("executeAttackSkill")
-        );
-
-        character.setFollowUpAttack(followUp, 0, []);
-        return character;
+        return loader.createCharacter("Fangsuan");
     };
 })();

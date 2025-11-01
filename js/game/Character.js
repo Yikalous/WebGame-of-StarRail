@@ -1,256 +1,743 @@
 class Character {
-    constructor(name, type, maxHp, attack, critRate, critDamage, maxEnergy, skills, icon = "🚀") {
+    constructor(name, type, maxHp, attack, defense, speed, critRate, critDamage, maxEnergy, skills, icon = "🚀", level = 80) {
         this.name = name;
         this.type = type;
+        this.level = level;
         this.maxHp = maxHp;
         this.currentHp = maxHp;
-        this.attack = attack;
+
+        // 基础属性
+        this.baseAttack = attack;        // 攻击白值
+        this.baseDefense = defense;      // 防御白值
+        this.speed = speed;
         this.critRate = critRate;
         this.critDamage = critDamage;
         this.maxEnergy = maxEnergy;
         this.currentEnergy = 0;
-        this.skills = skills;
+
+        // 百分比加成
+        this.attackPercent = 0;          // 攻击%加成
+        this.defensePercent = 0;         // 防御%加成
+        this.damageBonus = {};           // 各类伤害加成
+        this.breakEffect = 0;            // 击破特攻
+
+        // 特殊属性
+        this.defenseIgnore = 0;          // 无视防御%
+        this.resistancePenetration = {}; // 抗性穿透
+        this.vulnerability = 0;          // 易伤
+
+        this.skills = Array.isArray(skills) ? skills : [];
         this.icon = icon;
         this.statusEffects = [];
         this.isActive = false;
         this.gameState = null;
 
-        this.damageResistances = {
-            [DamageType.PHYSICAL]: 0,
-            [DamageType.FIRE]: 0,
-            [DamageType.ICE]: 0,
-            [DamageType.LIGHTNING]: 0,
-            [DamageType.QUANTUM]: 0,
-            [DamageType.IMAGINARY]: 0,
-            [DamageType.WIND]: 0,
-            [DamageType.PURE]: 0
-        };
+        // 抗性系统
+        this.damageResistances = Object.values(DamageType).reduce((obj, k) => {
+            obj[k] = 0;
+            return obj;
+        }, {});
 
-        // 新增：追加攻击相关属性
-        this.followUpAttackChance = 0;
-        this.followUpAttackSkill = null;
-        this.followUpAttackConditions = [];
-        this.lastUsedSkillType = null; // 记录最后使用的技能类型
-
-        // 钫酸的特殊属性
-        if (name === "钫酸") {
-            this.maxMana = 2000;
-            this.currentMana = 2000;
-            this.isSwordActive = false;
-            this.swordTimer = 0;
-        }
+        // 韧性系统（用于怪物）
+        this.toughness = type === 'enemy' ? 100 : 0;
+        this.maxToughness = type === 'enemy' ? 100 : 0;
+        this.isWeaknessBroken = false;
     }
 
-    takeDamage(damage, damageType = DamageType.PHYSICAL) {
-        let damageTakenBonus = 0;
+    // 获取实际攻击力（考虑各种加成）
+    getActualAttack() {
+        let attackBonus = this.attackPercent;
+
+        // 从状态效果中获取攻击加成
         this.statusEffects.forEach(effect => {
-            damageTakenBonus += effect.damageTakenBonus || 0;
+            if (effect.attackBonus) attackBonus += effect.attackBonus;
         });
 
-        const resistance = this.damageResistances[damageType] || 0;
-        const resistanceMultiplier = 1 - (resistance / 100);
-
-        const actualDamage = Math.floor(damage * (1 + damageTakenBonus) * resistanceMultiplier);
-        this.currentHp -= actualDamage;
-
-        if (this.currentHp < 0) {
-            for (const effect of this.statusEffects) {
-                if (effect.isImmuneDeath && this.currentHp <= 0) {
-                    this.currentHp = 1;
-                    return true;
-                }
-            }
-            this.currentHp = 0;
-        }
-
-        return this.currentHp > 0;
+        return this.baseAttack * (1 + attackBonus);
     }
 
-    performAttack(skill, target, allCharacters) {
-        // 记录最后使用的技能类型
-        this.lastUsedSkillType = skill.skillType;
-        
-        // 执行技能
-        const result = skill.execute(this, target, allCharacters);
-        
-        // 攻击后检查追加攻击
-        if (result && this.canTriggerFollowUp(skill.skillType, target)) {
-            setTimeout(() => {
-                this.executeFollowUpAttack(target, allCharacters);
-            }, 500);
-        }
-        
-        return result;
-    }
+    // 获取实际防御力
+    getActualDefense() {
+        let defenseBonus = this.defensePercent;
+        let defenseReduction = 0;
 
-    // 新增：设置追加攻击
-    setFollowUpAttack(skill, chance = 0.3, conditions = []) {
-        this.followUpAttackSkill = skill;
-        this.followUpAttackChance = chance;
-        this.followUpAttackConditions = conditions;
-    }
+        this.statusEffects.forEach(effect => {
+            if (effect.defenseBonus) defenseBonus += effect.defenseBonus;
+            if (effect.defenseReduction) defenseReduction += effect.defenseReduction;
+        });
 
-    // 新增：检查是否可以触发追加攻击
-    canTriggerFollowUp(attackType, target) {
-        if (!this.followUpAttackSkill) return false;
-        
-        // 钫酸特殊逻辑：宝剑激活时普通攻击必定触发追加攻击
-        if (this.name === "钫酸" && this.isSwordActive && attackType === SkillType.BASIC) {
-            return true;
-        }
-        
-        // 检查概率
-        if (Math.random() > this.followUpAttackChance) return false;
-        
-        // 检查触发条件
-        for (const condition of this.followUpAttackConditions) {
-            if (!this.checkFollowUpCondition(condition, target, attackType)) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
-
-    // 新增：检查触发条件
-    checkFollowUpCondition(condition, target, attackType) {
-        switch (condition.type) {
-            case 'targetHpBelow':
-                return target.currentHp / target.maxHp <= condition.value;
-            case 'targetHasDebuff':
-                return target.statusEffects.some(effect => 
-                    effect.name === condition.effectName || effect.isSilenced || effect.isStunned
-                );
-            case 'selfHpAbove':
-                return this.currentHp / this.maxHp >= condition.value;
-            case 'afterSkill':
-                return condition.skillTypes.includes(attackType);
-            default:
-                return true;
-        }
-    }
-
-    // 新增：执行追加攻击
-    executeFollowUpAttack(target, allCharacters) {
-        if (!this.followUpAttackSkill) return false;
-        
-        // 钫酸特殊逻辑：宝剑激活时使用特殊描述
-        if (this.name === "钫酸" && this.isSwordActive) {
-            this.gameState.addLog(
-                `<span style="color: #ba68c8">${this.name}的宝剑引导追加攻击！</span>`,
-                'buff'
-            );
-        } else {
-            this.gameState.addLog(
-                `<span style="color: #ba68c8">${this.name}触发追加攻击！</span>`,
-                'buff'
-            );
-        }
-        
-        return this.followUpAttackSkill.execute(this, target, allCharacters);
-    }
-
-
-    heal(amount) {
-        this.currentHp += amount;
-        if (this.currentHp > this.maxHp) {
-            this.currentHp = this.maxHp;
-        }
-    }
-
-    gainEnergy(amount) {
-        const oldEnergy = this.currentEnergy;
-        this.currentEnergy += amount;
-        if (this.currentEnergy > this.maxEnergy) {
-            this.currentEnergy = this.maxEnergy;
-        }
-        console.log(`获得能量: ${amount}, 从 ${oldEnergy} 到 ${this.currentEnergy}`);
-    }
-
-    useEnergy(amount) {
-        console.log(`使用能量: 需要 ${amount}, 当前 ${this.currentEnergy}`);
-        if (this.currentEnergy >= amount) {
-            this.currentEnergy -= amount;
-            console.log(`能量使用成功, 剩余 ${this.currentEnergy}`);
-            return true;
-        }
-        console.log(`能量不足, 使用失败`);
-        return false;
-    }
-
-    addStatusEffect(effect) {
-        this.statusEffects.push(effect);
-    }
-
-    removeStatusEffect(effectName) {
-        this.statusEffects = this.statusEffects.filter(effect => effect.name !== effectName);
-    }
-
-    hasStatusEffect(effectName) {
-        return this.statusEffects.some(effect => effect.name === effectName);
+        return this.baseDefense * (1 + defenseBonus) * (1 - defenseReduction);
     }
 
     updateStatusEffects() {
         this.statusEffects = this.statusEffects.filter(effect => {
-            effect.duration--;
+            effect.duration -= 1;
             return effect.duration > 0;
         });
     }
 
-    calculateFinalDamage(baseDamage, damageType = DamageType.PHYSICAL, skillType = SkillType.BASIC) {
-        let finalDamage = baseDamage;
+    gainEnergy(amount) {
+        this.currentEnergy = Math.min(this.maxEnergy, this.currentEnergy + amount);
+    }
 
-        const isCrit = Math.random() < this.critRate;
-        if (isCrit) {
-            finalDamage *= (1 + this.critDamage);
+    useEnergy(amount) {
+        if (this.currentEnergy >= amount) {
+            this.currentEnergy -= amount;
+            return true;
+        }
+        return false;
+    }
+
+    canUseSkill(skillType) {
+        // 检查是否被沉默
+        if (this.statusEffects.some(effect => effect.isSilenced)) {
+            return false;
         }
 
-        let totalDamageBonus = 0;
+        // 检查是否被眩晕
+        if (this.statusEffects.some(effect => effect.isStunned)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    // 添加技能目标选择相关方法
+    requiresTargetSelection() {
+        return this.targetType === TargetType.SINGLE;
+    }
+
+    getTargetDescription() {
+        const targetTypes = {
+            [TargetType.SINGLE]: '单体目标',
+            [TargetType.ALL_ENEMIES]: '全体敌人',
+            [TargetType.ALL_ALLIES]: '全体友方',
+            [TargetType.ALL]: '全体',
+            [TargetType.SELF]: '自身'
+        };
+        return targetTypes[this.targetType] || '选择目标';
+    }
+
+    // ===== 通用技能接口 =====
+    // Character.js - 修改 Attack 方法
+    Attack(type, baseStat = "attack", basenumber = [100], ratio = [1.0], target = this, damageType = DamageType.PHYSICAL, times = 1, skillType = SkillType.BASIC) {
+        const actualTarget = target || this;
+
+        switch (type) {
+            case "SINGLE":
+                for (let i = 0; i < times; i++) {
+                    let totalDamage = 0;
+                    for (let j = 0; j < basenumber.length; j++) {
+                        totalDamage += basenumber[j] + this.getActualAttack() * ratio[j];
+                    }
+
+                    if (actualTarget.currentHp > 0) {
+                        const finalDamage = this.calculateDamage(totalDamage, damageType, skillType, actualTarget);
+                        const survived = actualTarget.takeDamage(finalDamage, damageType);
+                        const critText = this.critArea > 1 ? " (暴击!)" : "";
+                        this.Log(`${this.name}对${actualTarget.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
+
+                        if (!survived) {
+                            this.Log(`${actualTarget.name}被击败了！`, 'damage');
+                        }
+                    }
+                }
+                break;
+
+            case "AOE":
+                const enemies = this.GetTargets("ALL_ENEMIES");
+                enemies.forEach(enemy => {
+                    for (let i = 0; i < times; i++) {
+                        let totalDamage = 0;
+                        for (let j = 0; j < basenumber.length; j++) {
+                            totalDamage += basenumber[j] + this.getActualAttack() * ratio[j];
+                        }
+
+                        if (enemy.currentHp > 0) {
+                            const finalDamage = this.calculateDamage(totalDamage, damageType, skillType, enemy);
+                            const survived = enemy.takeDamage(finalDamage, damageType);
+                            const critText = this.critArea > 1 ? " (暴击!)" : "";
+                            this.Log(`${this.name}对${enemy.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
+
+                            if (!survived) {
+                                this.Log(`${enemy.name}被击败了！`, 'damage');
+                            }
+                        }
+                    }
+                });
+                break;
+
+            case "BOUND":
+                const allEnemies = this.GetTargets("ALL_ENEMIES");
+                if (allEnemies.length === 0) {
+                    this.Log("没有可攻击的敌人", 'debuff');
+                    return;
+                }
+
+                this.Log(`${this.name} 发动弹射攻击！`, 'damage');
+
+                for (let i = 0; i < times; i++) {
+                    const randomIndex = Math.floor(Math.random() * allEnemies.length);
+                    const randomTarget = allEnemies[randomIndex];
+
+                    let totalDamage = 0;
+                    for (let j = 0; j < basenumber.length; j++) {
+                        totalDamage += basenumber[j] + this.getActualAttack() * ratio[j];
+                    }
+
+                    if (randomTarget.currentHp > 0) {
+                        const finalDamage = this.calculateDamage(totalDamage, damageType, skillType, randomTarget);
+                        const survived = randomTarget.takeDamage(finalDamage, damageType);
+                        const critText = this.critArea > 1 ? " (暴击!)" : "";
+                        this.Log(`第${i + 1}段弹射对${randomTarget.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
+
+                        if (!survived) {
+                            this.Log(`${randomTarget.name}被击败了！`, 'damage');
+                        }
+                    }
+                }
+                break;
+
+            case "SPREAD":
+                if (enemies.length === 0) {
+                    this.Log("没有可攻击的敌人", 'debuff');
+                    return;
+                }
+
+                // 找到主目标在敌人列表中的位置
+                const mainTargetIndex = enemies.findIndex(enemy => enemy === actualTarget);
+                if (mainTargetIndex === -1) {
+                    this.Log("主目标无效", 'debuff');
+                    return;
+                }
+
+                this.Log(`${this.name} 发动扩散攻击！`, 'damage');
+
+                // 对主目标造成伤害（使用第一个倍率）
+                for (let i = 0; i < times; i++) {
+                    let mainDamage = 0;
+                    const mainBase = basenumber[0] || 0;
+                    const mainRatio = ratio[0] || 0;
+                    mainDamage += mainBase + this.getActualAttack() * mainRatio;
+
+                    if (actualTarget.currentHp > 0) {
+                        const finalMainDamage = this.calculateDamage(mainDamage, damageType, skillType, actualTarget);
+                        const survived = actualTarget.takeDamage(finalMainDamage, damageType);
+                        const critText = this.critArea > 1 ? " (暴击!)" : "";
+                        this.Log(`${this.name}对${actualTarget.name}造成${finalMainDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
+
+                        if (!survived) {
+                            this.Log(`${actualTarget.name}被击败了！`, 'damage');
+                        }
+                    }
+                }
+
+                // 对相邻目标造成伤害（使用第二个倍率）
+                const adjacentTargets = this.getAdjacentTargets(enemies, mainTargetIndex);
+
+                adjacentTargets.forEach(adjacentTarget => {
+                    for (let i = 0; i < times; i++) {
+                        let spreadDamage = 0;
+                        const spreadBase = basenumber[1] || (basenumber[0] || 0); // 如果没有第二个倍率，使用第一个
+                        const spreadRatio = ratio[1] || (ratio[0] || 0); // 如果没有第二个倍率，使用第一个
+                        spreadDamage += spreadBase + this.getActualAttack() * spreadRatio;
+
+                        if (adjacentTarget.currentHp > 0) {
+                            const finalSpreadDamage = this.calculateDamage(spreadDamage, damageType, skillType, adjacentTarget);
+                            const survived = adjacentTarget.takeDamage(finalSpreadDamage, damageType);
+                            const critText = this.critArea > 1 ? " (暴击!)" : "";
+                            this.Log(`扩散对${adjacentTarget.name}造成${finalSpreadDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
+
+                            if (!survived) {
+                                this.Log(`${adjacentTarget.name}被击败了！`, 'damage');
+                            }
+                        }
+                    }
+                });
+                break;
+
+            default:
+                console.warn(`未知的攻击类型: ${type}`);
+        }
+    }
+
+    getAdjacentTargets(enemies, mainIndex) {
+        const adjacentTargets = [];
+
+        // 左边的目标
+        if (mainIndex > 0) {
+            adjacentTargets.push(enemies[mainIndex - 1]);
+        }
+
+        // 右边的目标
+        if (mainIndex < enemies.length - 1) {
+            adjacentTargets.push(enemies[mainIndex + 1]);
+        }
+
+        return adjacentTargets;
+    }
+
+    Heal(targetMode, amount, ratio = 0) {
+        const targets = this.GetTargets(targetMode);
+        targets.forEach(t => {
+            const healAmt = Math.floor(amount + this.attack * ratio);
+            t.currentHp = Math.min(t.maxHp, t.currentHp + healAmt);
+            this.Log(`${this.name}治疗了${t.name} ${healAmt} HP`, 'heal');
+        });
+    }
+
+    GetTargets(mode) {
+        const allies = this.gameState.getAllies().filter(c => c.currentHp > 0);
+        const enemies = this.gameState.getEnemies().filter(c => c.currentHp > 0);
+        switch (mode) {
+            case "SINGLE": return [enemies[0]];
+            case "ALL_ENEMIES": return enemies;
+            case "ALL_ALLIES": return allies;
+            case "SELF": return [this];
+            case "SPREAD": return enemies.slice(0, 3);
+            default: return [];
+        }
+    }
+
+    ApplyDamage(target, dmg, type = DamageType.PHYSICAL) {
+        const result = this.calculateFinalDamage(dmg, type);
+        target.takeDamage(result.damage, type);
+        const critText = result.isCrit ? " (暴击!)" : "";
+        this.Log(`${this.name}对${target.name}造成${result.damage}${critText}点${type}伤害`, 'damage');
+    }
+
+    // Character.js - 更新 takeDamage 方法
+    takeDamage(amount, type) {
+        // 免疫死亡状态检查
+        if (this.hasStatusType("immune") && amount >= this.currentHp) {
+            this.currentHp = 1;
+            this.Log(`${this.name} 免疫了致命伤害！`, 'buff');
+            return true;
+        }
+
+        this.currentHp = Math.max(0, this.currentHp - amount);
+        return this.currentHp > 0;
+    }
+
+    // Character.js - 添加完整的伤害计算方法
+    calculateDamage(baseDamage, damageType, skillType, target, isBreakDamage = false) {
+        // === 1. 基础伤害区 ===
+        const baseDamageArea = baseDamage;
+
+        // === 2. 防御区 ===
+        const defenseArea = this.calculateDefenseArea(target);
+
+        // === 3. 双暴区 ===
+        const critArea = this.calculateCritArea();
+
+        // === 4. 击破特攻区 ===
+        const breakArea = isBreakDamage ? this.calculateBreakArea() : 1;
+
+        // === 5. 增伤区 ===
+        const damageBonusArea = this.calculateDamageBonusArea(damageType, skillType);
+
+        // === 6. 易伤区 ===
+        const vulnerabilityArea = this.calculateVulnerabilityArea(target);
+
+        // === 7. 虚弱区 === (这里简化处理)
+        const weaknessArea = 1; // 通常为1
+
+        // === 8. 减伤区 ===
+        const damageReductionArea = this.calculateDamageReductionArea(target);
+
+        // === 9. 抗性区 ===
+        const resistanceArea = this.calculateResistanceArea(damageType, target);
+
+        // 最终伤害计算
+        let finalDamage = baseDamageArea * defenseArea * critArea * breakArea *
+            damageBonusArea * vulnerabilityArea * weaknessArea *
+            damageReductionArea * resistanceArea;
+
+        return Math.floor(finalDamage);
+    }
+
+    // 防御区计算
+    calculateDefenseArea(target) {
+        const attackerLevel = this.level;
+        const defenderLevel = target.level;
+        const defenderDefense = target.getActualDefense();
+
+        // 计算无视防御
+        let defenseIgnore = this.defenseIgnore;
         this.statusEffects.forEach(effect => {
-            totalDamageBonus += effect.getDamageBonus(skillType);
+            defenseIgnore += effect.defenseIgnore || 0;
         });
 
-        finalDamage *= (1 + totalDamageBonus);
+        const actualDefense = defenderDefense * (1 - defenseIgnore);
 
-        if (damageType !== DamageType.PURE) {
-            const resistance = this.damageResistances[damageType] || 0;
-            finalDamage *= (1 - resistance / 100);
+        return (200 + 10 * attackerLevel) / ((200 + 10 * attackerLevel) + actualDefense);
+    }
+
+    // 双暴区计算
+    calculateCritArea() {
+        const isCrit = Math.random() < this.critRate;
+        return isCrit ? (1 + this.critDamage) : 1;
+    }
+
+    // 击破特攻区计算
+    calculateBreakArea() {
+        let breakEffect = this.breakEffect;
+        this.statusEffects.forEach(effect => {
+            breakEffect += effect.breakEffect || 0;
+        });
+        return 1 + breakEffect;
+    }
+
+    // 增伤区计算
+    // 修改伤害计算方法，整合所有状态效果加成
+    calculateDamageBonusArea(damageType, skillType) {
+        let totalBonus = 0;
+
+        // 基础伤害加成
+        if (this.damageBonus[damageType]) {
+            totalBonus += this.damageBonus[damageType];
         }
 
-        return {
-            damage: Math.floor(finalDamage),
-            isCrit: isCrit,
-            damageType: damageType,
-            skillType: skillType
-        };
+        // 技能类型加成
+        totalBonus += this.getTotalDamageBonus(skillType);
+
+        // 伤害类型加成
+        totalBonus += this.getTotalDamageTypeBonus(damageType);
+
+        // 状态效果提供的所有加成
+        this.statusEffects.forEach(effect => {
+            totalBonus += effect.getDamageBonus(skillType);
+            totalBonus += effect.getDamageTypeBonus(damageType);
+        });
+
+        return 1 + totalBonus;
+    }
+
+    // 新增方法：获取特定伤害类型的总加成
+    getTotalDamageTypeBonus(damageType) {
+        let bonus = 0;
+
+        // 角色自身的伤害类型加成
+        switch (damageType) {
+            case DamageType.PHYSICAL: bonus += this.damageBonus.physical || 0; break;
+            case DamageType.FIRE: bonus += this.damageBonus.fire || 0; break;
+            case DamageType.ICE: bonus += this.damageBonus.ice || 0; break;
+            case DamageType.LIGHTNING: bonus += this.damageBonus.lightning || 0; break;
+            case DamageType.QUANTUM: bonus += this.damageBonus.quantum || 0; break;
+            case DamageType.IMAGINARY: bonus += this.damageBonus.imaginary || 0; break;
+            case DamageType.WIND: bonus += this.damageBonus.wind || 0; break;
+        }
+
+        return bonus;
+    }
+
+    // 易伤区计算
+    calculateVulnerabilityArea(target) {
+        let vulnerability = target.vulnerability;
+        target.statusEffects.forEach(effect => {
+            vulnerability += effect.vulnerability || 0;
+            vulnerability += effect.damageTakenBonus || 0;
+        });
+        return 1 + vulnerability;
+    }
+
+    // 减伤区计算
+    calculateDamageReductionArea(target) {
+        let damageReduction = 0;
+        target.statusEffects.forEach(effect => {
+            damageReduction += effect.damageReduction || 0;
+        });
+
+        // 韧性减伤（怪物韧性未破时）
+        if (target.type === 'enemy' && !target.isWeaknessBroken && target.toughness > 0) {
+            damageReduction += 0.1; // 10%韧性减伤
+        }
+
+        return 1 - damageReduction;
+    }
+
+    // 抗性区计算
+    calculateResistanceArea(damageType, target) {
+        // 基础抗性
+        let baseResistance = 0;
+        if (target.type === 'enemy') {
+            baseResistance = 0.2; // 20%基础抗性
+        }
+
+        // 角色抗性
+        const characterResistance = target.damageResistances[damageType] || 0;
+
+        // 抗性降低（来自攻击者的状态效果）
+        let resistanceReduction = 0;
+        this.statusEffects.forEach(effect => {
+            resistanceReduction += effect.getResistanceReduction(damageType);
+        });
+
+        // 抗性穿透（来自攻击者的状态效果）
+        let resistancePenetration = this.resistancePenetration[damageType] || 0;
+        this.statusEffects.forEach(effect => {
+            resistancePenetration += effect.getResistancePenetration(damageType);
+        });
+
+        // 目标身上的抗性降低效果
+        target.statusEffects.forEach(effect => {
+            resistanceReduction += effect.getResistanceReduction(damageType);
+        });
+
+        const finalResistance = baseResistance + characterResistance - resistanceReduction - resistancePenetration;
+
+        return Math.max(0, Math.min(2, 1 - finalResistance));
+    }
+
+    Log(msg, type = 'normal') {
+        if (this.gameState?.addLog) this.gameState.addLog(msg, type);
+        else console.log(msg);
     }
 
     canAct() {
-        if (this.hasStatusEffect("眩晕") || this.statusEffects.some(effect => effect.isStunned)) {
-            return false;
-        }
+        // 不能行动条件：死亡或眩晕等控制状态
+        if (this.currentHp <= 0) return false;
+        if (this.hasStatusType("stun")) return false;
         return true;
     }
 
     canUseSkill(skillType) {
-        if (!this.canAct()) {
-            return false;
-        }
+        if (this.currentHp <= 0) return false;
+        if (this.hasStatusType("stun")) return false;
 
-        if ((skillType === SkillType.SKILL || skillType === SkillType.ULTIMATE) && 
-            (this.hasStatusEffect("技能沉默") || this.statusEffects.some(effect => effect.isSilenced))) {
-            return false;
+        // 检查是否被沉默（不影响终极技和特殊技）
+        if (this.hasStatusType("silence")) {
+            return skillType === SkillType.ULTIMATE || skillType === SkillType.SPECIAL;
         }
 
         return true;
     }
 
-    setDamageResistance(damageType, resistance) {
-        this.damageResistances[damageType] = resistance;
+    hasStatusEffect(name) {
+        return this.statusEffects.some(se => se.name === name);
     }
 
-    getDamageResistance(damageType) {
-        return this.damageResistances[damageType] || 0;
+    addStatusEffect(name, type, value, duration = 3, turnType = 'all', triggerTime = 'end', extraParams = {}) {
+        // 创建基础状态效果
+        const effect = new StatusEffect(name, duration);
+        effect.turnType = turnType;
+        effect.triggerTime = triggerTime;
+        effect.owner = this;
+        effect.appliedTurn = this.gameState?.turnCount || 0;
+
+        // 根据类型设置不同的效果属性
+        switch (type) {
+            // === 基础属性加成 ===
+            case "attackBonus":
+                effect.attackBonus = value;
+                break;
+            case "defenseBonus":
+                effect.defenseBonus = value;
+                break;
+            case "speedBonus":
+                effect.speedBonus = value;
+                break;
+
+            // === 百分比属性加成 ===
+            case "attackPercent":
+                effect.attackPercent = value;
+                break;
+            case "defensePercent":
+                effect.defensePercent = value;
+                break;
+
+            // === 伤害加成区 ===
+            case "damageBonus":
+                effect.damageBonus = value;
+                break;
+            case "basicAttackBonus":
+                effect.basicAttackBonus = value;
+                break;
+            case "skillBonus":
+                effect.skillBonus = value;
+                break;
+            case "ultimateBonus":
+                effect.ultimateBonus = value;
+                break;
+            case "followUpBonus":
+                effect.followUpBonus = value;
+                break;
+
+            // === 伤害类型加成 ===
+            case "physicalBonus":
+                effect.physicalBonus = value;
+                break;
+            case "fireBonus":
+                effect.fireBonus = value;
+                break;
+            case "iceBonus":
+                effect.iceBonus = value;
+                break;
+            case "lightningBonus":
+                effect.lightningBonus = value;
+                break;
+            case "quantumBonus":
+                effect.quantumBonus = value;
+                break;
+            case "imaginaryBonus":
+                effect.imaginaryBonus = value;
+                break;
+            case "windBonus":
+                effect.windBonus = value;
+                break;
+
+            // === 易伤和抗性区 ===
+            case "damageTakenBonus":
+                effect.damageTakenBonus = value;
+                break;
+            case "vulnerability":
+                effect.vulnerability = value;
+                break;
+
+            // === 抗性相关 ===
+            case "resistanceReduction":
+                effect.resistanceReduction = value; // value 应该是对象 {物理: 0.1}
+                break;
+            case "defenseIgnore":
+                effect.defenseIgnore = value;
+                break;
+            case "resistancePenetration":
+                effect.resistancePenetration = value; // value 应该是对象 {物理: 0.1}
+                break;
+
+            // === 击破相关 ===
+            case "breakEffect":
+                effect.breakEffect = value;
+                break;
+            case "breakEfficiency":
+                effect.breakEfficiency = value;
+                break;
+
+            // === 特殊状态 ===
+            case "immune":
+                effect.isImmuneDeath = true;
+                break;
+            case "silence":
+                effect.isSilenced = true;
+                break;
+            case "stun":
+                effect.isStunned = true;
+                effect.triggerTime = 'start';
+                break;
+            case "freeze":
+                effect.isFrozen = true;
+                effect.triggerTime = 'start';
+                break;
+            case "burn":
+                effect.isBurned = true;
+                break;
+            case "shock":
+                effect.isShocked = true;
+                break;
+
+            default:
+                console.warn(`未知的状态效果类型: ${type}`);
+                return;
+        }
+
+        // 处理额外参数
+        if (extraParams.turnType) effect.turnType = extraParams.turnType;
+        if (extraParams.triggerTime) effect.triggerTime = extraParams.triggerTime;
+
+        // 检查是否已存在同名效果
+        const existingIndex = this.statusEffects.findIndex(eff => eff.name === name);
+        if (existingIndex !== -1) {
+            this.statusEffects[existingIndex] = effect;
+            this.Log(`${this.name}的状态【${name}】已更新`, 'buff');
+        } else {
+            this.statusEffects.push(effect);
+            this.Log(`${this.name}获得状态【${name}】`, 'buff');
+        }
+
+        return effect;
+    }
+
+    // 新增方法：获取特定伤害类型的总加成
+    getTotalDamageTypeBonus(damageType) {
+        let bonus = 0;
+
+        // 角色自身的伤害类型加成
+        switch (damageType) {
+            case DamageType.PHYSICAL: bonus += this.damageBonus.physical || 0; break;
+            case DamageType.FIRE: bonus += this.damageBonus.fire || 0; break;
+            case DamageType.ICE: bonus += this.damageBonus.ice || 0; break;
+            case DamageType.LIGHTNING: bonus += this.damageBonus.lightning || 0; break;
+            case DamageType.QUANTUM: bonus += this.damageBonus.quantum || 0; break;
+            case DamageType.IMAGINARY: bonus += this.damageBonus.imaginary || 0; break;
+            case DamageType.WIND: bonus += this.damageBonus.wind || 0; break;
+        }
+
+        return bonus;
+    }
+
+    // 新增方法：批量添加状态效果
+    addMultipleStatusEffects(effects) {
+        effects.forEach(effectConfig => {
+            this.addStatusEffect(
+                effectConfig.name,
+                effectConfig.type,
+                effectConfig.value,
+                effectConfig.duration,
+                effectConfig.turnType,
+                effectConfig.triggerTime,
+                effectConfig.extraParams
+            );
+        });
+    }
+
+    getDamageTypeText(damageType) {
+        const texts = {
+            [DamageType.PHYSICAL]: '物理',
+            [DamageType.FIRE]: '火',
+            [DamageType.ICE]: '冰',
+            [DamageType.LIGHTNING]: '雷',
+            [DamageType.QUANTUM]: '量子',
+            [DamageType.IMAGINARY]: '虚数',
+            [DamageType.WIND]: '风',
+            [DamageType.PURE]: '真实'
+        };
+        return texts[damageType] || damageType;
+    }
+
+    // 检查是否有特定类型的状态效果
+    hasStatusType(type) {
+        return this.statusEffects.some(effect => {
+            switch (type) {
+                case "silence": return effect.isSilenced;
+                case "stun": return effect.isStunned;
+                case "immune": return effect.isImmuneDeath;
+                default: return false;
+            }
+        });
+    }
+
+    // 移除特定类型的状态效果
+    removeStatusType(type) {
+        this.statusEffects = this.statusEffects.filter(effect => {
+            switch (type) {
+                case "silence": return !effect.isSilenced;
+                case "stun": return !effect.isStunned;
+                case "immune": return !effect.isImmuneDeath;
+                default: return true;
+            }
+        });
+    }
+
+    // 获取所有状态效果的总加成
+    getTotalDamageBonus(skillType) {
+        return this.statusEffects.reduce((total, effect) => {
+            return total + effect.getDamageBonus(skillType);
+        }, 0);
+    }
+
+    // 检查是否可以被眩晕（免疫死亡状态可能免疫眩晕）
+    canBeStunned() {
+        return !this.hasStatusType("immune");
     }
 }
 

@@ -6,7 +6,7 @@ class UIManager {
         this.skillPanel = new SkillPanel();
         this.isProcessing = false;
         this.selectedSkill = null; // 当前选择的技能
-        
+
         this.initializeEventListeners();
     }
 
@@ -24,7 +24,7 @@ class UIManager {
         this.updateCurrentTurn();
         this.updateSkillPanel();
         this.updateBattleLog();
-        
+
         if (this.gameState.isGameOver) {
             this.showGameOver();
         } else {
@@ -36,18 +36,18 @@ class UIManager {
 
     executeEnemyTurn() {
         if (this.isProcessing) return;
-        
+
         this.isProcessing = true;
         const currentEnemy = this.gameState.characters[this.gameState.currentTurnIndex];
-        
+
         console.log(`执行 ${currentEnemy.name} 的回合`);
-        
+
         setTimeout(() => {
             try {
                 const allSurvived = this.battleSystem.executeEnemyTurn(currentEnemy);
                 this.gameState.checkGameEnd();
                 this.updateUI();
-                
+
                 if (!allSurvived) {
                     setTimeout(() => {
                         this.continueToNextTurn();
@@ -65,10 +65,10 @@ class UIManager {
     continueToNextTurn() {
         const isPlayerTurn = this.gameState.nextTurn();
         this.isProcessing = false;
-        
+
         if (!this.gameState.isGameOver) {
             this.updateUI();
-            
+
             if (!isPlayerTurn) {
                 setTimeout(() => {
                     this.executeEnemyTurn();
@@ -80,45 +80,45 @@ class UIManager {
     updateCharacterDisplay() {
         const alliesContainer = document.getElementById('allies-container');
         const enemiesContainer = document.getElementById('enemies-container');
-        
+
         alliesContainer.innerHTML = '';
         enemiesContainer.innerHTML = '';
 
         // 绘制我方角色
         this.gameState.getAllies().forEach(character => {
             const characterElement = this.battleRenderer.createCharacterElement(character);
-            
+
             // 为角色添加点击事件
             characterElement.addEventListener('click', () => {
                 this.handleCharacterClick(character);
             });
-            
+
             // 如果当前有选中的技能，高亮可用的目标
             if (this.selectedSkill) {
                 if (this.isValidTarget(character, this.selectedSkill)) {
                     characterElement.classList.add('selectable-target');
                 }
             }
-            
+
             alliesContainer.appendChild(characterElement);
         });
 
         // 绘制敌方角色
         this.gameState.getEnemies().forEach(character => {
             const characterElement = this.battleRenderer.createCharacterElement(character);
-            
+
             // 为角色添加点击事件
             characterElement.addEventListener('click', () => {
                 this.handleCharacterClick(character);
             });
-            
+
             // 如果当前有选中的技能，高亮可用的目标
             if (this.selectedSkill) {
                 if (this.isValidTarget(character, this.selectedSkill)) {
                     characterElement.classList.add('selectable-target');
                 }
             }
-            
+
             enemiesContainer.appendChild(characterElement);
         });
     }
@@ -146,9 +146,9 @@ class UIManager {
         const currentTurnElement = document.getElementById('current-turn');
         const turnIndicator = document.getElementById('turn-indicator');
         const currentCharacter = this.gameState.characters[this.gameState.currentTurnIndex];
-        
+
         currentTurnElement.textContent = `当前行动: ${currentCharacter.name}`;
-        
+
         if (this.gameState.isPlayerTurn) {
             turnIndicator.textContent = '👤 玩家回合';
             turnIndicator.className = 'turn-indicator player-turn';
@@ -160,27 +160,31 @@ class UIManager {
 
     updateSkillPanel() {
         const skillsContainer = document.getElementById('skills-container');
+        if (!skillsContainer) return;
+
         const currentCharacter = this.gameState.characters[this.gameState.currentTurnIndex];
-        
+        if (!currentCharacter) return;
+
+        // 防御性检查：确保 skills 是数组
+        const skills = Array.isArray(currentCharacter.skills) ? currentCharacter.skills : [];
+
         skillsContainer.innerHTML = '';
-        
-        Object.values(currentCharacter.skills).forEach(skill => {
+
+        skills.forEach(skill => {
             const skillElement = this.skillPanel.createSkillElement(skill, currentCharacter, this.battleSystem);
-            
+
             skillElement.addEventListener('click', () => {
                 this.handleSkillClick(skill, currentCharacter);
             });
-            
-            // 添加目标类型提示
+
             const targetDesc = document.createElement('div');
             targetDesc.className = 'skill-target-desc';
-            targetDesc.textContent = skill.getTargetDescription();
+            targetDesc.textContent = skill.getTargetDescription ? skill.getTargetDescription() : '选择目标';
             targetDesc.style.fontSize = '0.6rem';
             targetDesc.style.color = '#b0b0ff';
             targetDesc.style.marginTop = '3px';
-            
             skillElement.appendChild(targetDesc);
-            
+
             skillsContainer.appendChild(skillElement);
         });
     }
@@ -204,13 +208,13 @@ class UIManager {
     executeSkill(skill, user) {
         this.isProcessing = true;
         this.selectedSkill = null; // 清除选中的技能
-        
+
         console.log(`直接执行技能: ${skill.name}`);
         const allSurvived = this.battleSystem.executeSkill(skill, user);
-        
+
         this.gameState.checkGameEnd();
         this.updateUI();
-        
+
         if (!allSurvived) {
             setTimeout(() => {
                 this.continueToNextTurn();
@@ -222,7 +226,7 @@ class UIManager {
 
     handleCharacterClick(character) {
         console.log('角色被点击:', character.name);
-        
+
         // 如果当前没有选中的技能，或者正在处理中，忽略点击
         if (!this.selectedSkill || this.isProcessing) {
             console.log('没有选中的技能或正在处理中，忽略点击');
@@ -239,19 +243,19 @@ class UIManager {
         // 执行技能
         this.executeSkillWithTarget(this.selectedSkill, character);
     }
-    
+
     // 修改：执行技能（需要选择目标）
     executeSkillWithTarget(skill, target) {
         this.isProcessing = true;
         const user = this.gameState.characters[this.gameState.currentTurnIndex];
-        
+
         console.log(`执行带目标的技能: ${skill.name}, 目标: ${target.name}`);
         const allSurvived = this.battleSystem.executeSkill(skill, user, target);
-        
+
         this.selectedSkill = null; // 清除选中的技能
         this.gameState.checkGameEnd();
         this.updateUI();
-        
+
         if (!allSurvived) {
             setTimeout(() => {
                 this.continueToNextTurn();
@@ -264,7 +268,7 @@ class UIManager {
     // 修改：检查目标是否有效
     isValidTarget(character, skill) {
         const user = this.gameState.characters[this.gameState.currentTurnIndex];
-        
+
         // 检查目标是否存活
         if (character.currentHp <= 0) {
             console.log('目标已死亡，无效');
@@ -298,14 +302,14 @@ class UIManager {
 
     executePlayerSkillWithTarget(skill, user, target) {
         this.isProcessing = true;
-        
+
         const allSurvived = this.battleSystem.executeSkill(skill, user, target);
-        
+
         this.gameState.selectedSkill = null;
         this.hideTargetSelection();
         this.gameState.checkGameEnd();
         this.updateUI();
-        
+
         if (!allSurvived) {
             setTimeout(() => {
                 this.continueToNextTurn();
@@ -318,7 +322,7 @@ class UIManager {
     updateBattleLog() {
         const logEntries = document.getElementById('log-entries');
         logEntries.innerHTML = '';
-        
+
         this.gameState.log.forEach(logEntry => {
             const logElement = document.createElement('div');
             logElement.className = 'log-entry';
@@ -326,7 +330,7 @@ class UIManager {
             logElement.style.color = logEntry.color;
             logEntries.appendChild(logElement);
         });
-        
+
         logEntries.scrollTop = logEntries.scrollHeight;
     }
 

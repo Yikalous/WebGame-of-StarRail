@@ -21,7 +21,7 @@ class SkillPanel {
             <div class="skill-desc">${skill.description}</div>
             ${damageTypeHTML}
             <div class="skill-tags">${tagsHTML}</div>
-            <div class="skill-desc">能量消耗: ${skill.energyCost}</div>
+            <div class="skill-desc">战技点消耗: ${skill.energyCost}</div>
         `;
         
         return skillElement;

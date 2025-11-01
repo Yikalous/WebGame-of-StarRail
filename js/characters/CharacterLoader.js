@@ -15,29 +15,47 @@ class CharacterLoader {
             return null;
         }
 
-        const skills = {};
-        template.skills.forEach(skillConfig => {
-            const executeFunc = this.skillExecutor.getSkillFunction(skillConfig.executeFunc);
-            const tags = Array.isArray(skillConfig.tags) ? skillConfig.tags : [];
-            
-            skills[skillConfig.skillType] = new Skill(
-                skillConfig.name,
-                skillConfig.description,
-                skillConfig.energyCost,
-                skillConfig.targetType,
-                skillConfig.skillType,
-                skillConfig.damageType || DamageType.PHYSICAL,
-                tags,
-                skillConfig.icon,
-                executeFunc
-            );
-        });
+        // 确保技能是数组
+        const skills = [];
+
+        // 检查 template.skills 是否存在且是数组
+        if (Array.isArray(template.skills)) {
+            template.skills.forEach(skillConfig => {
+                let executeFunc = null;
+                if (typeof skillConfig.executeFunc === 'function') {
+                    executeFunc = skillConfig.executeFunc;
+                } else {
+                    executeFunc = () => {
+                        console.warn(`${skillConfig.name} 技能尚未实现`);
+                    };
+                }
+
+                const tags = Array.isArray(skillConfig.tags) ? skillConfig.tags : [];
+
+                skills.push(new Skill(
+                    skillConfig.name,
+                    skillConfig.description,
+                    skillConfig.energyCost || 0,
+                    skillConfig.targetType,
+                    skillConfig.skillType,
+                    skillConfig.damageType || DamageType.PHYSICAL,
+                    tags,
+                    skillConfig.icon,
+                    executeFunc,
+                    skillConfig.filter  // 传入 filter 函数
+                ));
+            });
+        } else {
+            console.warn(`角色 ${characterName} 没有定义技能`);
+        }
 
         return new Character(
             template.name,
             template.type,
             template.maxHp,
             template.attack,
+            template.defense || 0,
+            template.speed || 100,
             template.critRate,
             template.critDamage,
             template.maxEnergy,
@@ -46,17 +64,11 @@ class CharacterLoader {
         );
     }
 
-    /** 
-     * 根据配置创建多个角色实例
-     * 由外部传入角色名数组
-     */
     loadCharacters(names = []) {
         const characters = [];
         for (const name of names) {
             const character = this.createCharacter(name);
-            if (character) {
-                characters.push(character);
-            }
+            if (character) characters.push(character);
         }
         return characters;
     }

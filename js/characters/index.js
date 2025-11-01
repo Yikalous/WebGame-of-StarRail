@@ -31,8 +31,6 @@
 
         // === 我方角色 ===
         maybeRegister("registerFangsuan");
-        maybeRegister("registerTrailblazer");
-        maybeRegister("registerSilverWolf");
 
         // === 敌方角色（重复3次） ===
         maybeRegister("registerAntimatterLegion", 3);

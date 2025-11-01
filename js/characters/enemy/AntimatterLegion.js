@@ -15,25 +15,26 @@
         skills: [
             {
                 name: "普通攻击",
-                description: "对敌方单体造成100%攻击力的物理伤害",
-                energyCost: 0,
+                description: "对敌方单体造成物理伤害",
                 targetType: TargetType.SINGLE,
                 skillType: SkillType.BASIC,
-                damageType: DamageType.PHYSICAL,
                 tags: [SkillTag.ATTACK, SkillTag.SINGLE_TARGET],
                 icon: "⚔️",
-                executeFunc: "basicAttack"
+                executeFunc: function(user, target) {
+                    user.Attack("SINGLE", "attack", [0], [1.0], target || user, DamageType.PHYSICAL);
+                }
             },
             {
                 name: "能量冲击",
-                description: "对敌方单体造成150%攻击力的雷属性伤害",
+                description: "对敌方单体造成雷属性伤害",
                 energyCost: 1,
                 targetType: TargetType.SINGLE,
                 skillType: SkillType.SKILL,
-                damageType: DamageType.LIGHTNING,
                 tags: [SkillTag.ATTACK, SkillTag.SINGLE_TARGET],
                 icon: "✨",
-                executeFunc: "basicAttack"
+                executeFunc: function(user, target) {
+                    user.Attack("SINGLE", "attack", [0], [1.5], target || user, DamageType.LIGHTNING);
+                }
             }
         ]
     };
