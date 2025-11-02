@@ -60,7 +60,8 @@ class CharacterLoader {
             template.critDamage,
             template.maxPoint,
             skills,
-            template.icon
+            template.icon,
+            template.image || "",
         );
         
         // 复制tag属性（如果模板中有定义）

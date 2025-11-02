@@ -22,20 +22,32 @@ class BattleRenderer {
         const canAct = character.canAct();
         const actionStatus = canAct ? '' : '<div class="action-status cannot-act">无法行动</div>';
 
-        characterElement.innerHTML = `
-            <div class="character-icon">${character.icon}</div>
-            <div class="character-name">${character.name}</div>
-            ${actionStatus}
-            <div class="hp-bar">
-                <div class="hp-fill" style="width: ${hpPercent}%"></div>
-            </div>
-            <div class="Point-bar">
-                <div class="Point-fill" style="width: ${PointPercent}%"></div>
-            </div>
-            ${manaHTML}
-            <div class="character-stats">HP: ${character.currentHp}/${character.maxHp}</div>
-            ${statusEffectsHTML}
-        `;
+characterElement.innerHTML = `
+    <div class="character-icon" 
+        style="
+            ${character.image
+                ? `background-image: url('${character.image}');
+                   background-size: cover;
+                   background-position: center;
+                   background-repeat: no-repeat;`
+                : ''}
+        ">
+        ${!character.image ? character.icon : ''}
+    </div>
+    <div class="character-name">${character.name}</div>
+    ${actionStatus}
+    <div class="hp-bar">
+        <div class="hp-fill" style="width: ${hpPercent}%"></div>
+    </div>
+    <div class="Point-bar">
+        <div class="Point-fill" style="width: ${PointPercent}%"></div>
+    </div>
+    ${manaHTML}
+    <div class="character-stats">HP: ${character.currentHp}/${character.maxHp}</div>
+    ${statusEffectsHTML}
+`;
+
+console.log("加载角色图片：", character.name, character.image);
 
         return characterElement;
     }

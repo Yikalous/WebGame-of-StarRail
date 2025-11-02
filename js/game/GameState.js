@@ -8,8 +8,37 @@ class GameState {
         this.selectedSkill = null;
         this.selectedTarget = null;
         this.isPlayerTurn = true;
-        this.actionQueue = []; // 行动队列（按优先级排序）
-        this.SPEED_TRACK_LENGTH = 500; // 速度条长度
+        this.actionQueue = [];
+        this.SPEED_TRACK_LENGTH = 500;
+
+        // 初始化全局回合事件监听器
+        this.initializeTurnEventListeners();
+    }
+
+    initializeTurnEventListeners() {
+        // 监听全局回合开始事件
+        window.eventSystem.on('global_turn_start', (event) => {
+            const { character, turnCount, isPlayerTurn } = event.data;
+            console.log(`🎯 全局回合开始: ${character.name} 第${turnCount}回合`);
+        });
+
+        // 监听回合结束事件
+        window.eventSystem.on('turn_end', (event) => {
+            const { source, turnCount } = event.data;
+            console.log(`🏁 回合结束: ${source.name}`);
+        });
+
+        // 监听状态效果移除事件
+        window.eventSystem.on('status_effect_removed', (event) => {
+            const { source, effect } = event.data;
+            console.log(`❌ 状态效果移除: ${source.name} - ${effect.name}`);
+        });
+
+        // 监听额外行动事件
+        window.eventSystem.on('extra_action_gained', (event) => {
+            const { source } = event.data;
+            console.log(`⚡ 额外行动: ${source.name}`);
+        });
     }
 
     addCharacter(character) {
@@ -37,10 +66,10 @@ class GameState {
                 char.actionValue = 0;
             }
         });
-        
+
         // 构建初始行动队列（按速度排序）
         this.updateActionQueue();
-        
+
         // 推进角色直到至少有一个角色可以行动
         let iterations = 0;
         const maxIterations = 1000;
@@ -53,7 +82,7 @@ class GameState {
     // 更新行动队列（按行动值排序，行动值高的在前）
     updateActionQueue() {
         const aliveCharacters = this.getAliveCharacters();
-        
+
         // 按行动值降序排序，行动值相同则按速度降序
         this.actionQueue = aliveCharacters.slice().sort((a, b) => {
             if (b.actionValue !== a.actionValue) {
@@ -61,7 +90,7 @@ class GameState {
             }
             return b.getActualSpeed() - a.getActualSpeed();
         });
-        
+
         console.log('行动队列更新:', this.actionQueue.map(c => ({
             name: c.name,
             actionValue: c.actionValue,
@@ -76,7 +105,7 @@ class GameState {
                 char.advanceActionValue();
             }
         });
-        
+
         // 更新行动队列
         this.updateActionQueue();
     }
@@ -102,7 +131,7 @@ class GameState {
                 actionValue = this.SPEED_TRACK_LENGTH;
             }
         }
-        
+
         character.actionValue = actionValue;
         this.updateActionQueue();
     }
@@ -119,17 +148,29 @@ class GameState {
 
         // 如果有当前行动角色，处理回合结束
         if (currentCharacter) {
-        console.log(`=== ${currentCharacter.name} 的回合结束 ===`);
+            console.log(`=== ${currentCharacter.name} 的回合结束 ===`);
 
-            // 处理回合开始前效果
-        this.handleTurnStartEffects(currentCharacter);
+            // 触发回合结束事件
+            currentCharacter.trigger('turn_end', {
+                turnCount: this.turnCount,
+                actionValue: currentCharacter.actionValue
+            });
 
-            // 处理回合结束后效果
-        this.handleTurnEndEffects(currentCharacter);
+            // 处理回合开始前效果（通过事件系统）
+            this.handleTurnStartEffects(currentCharacter);
+
+            // 处理回合结束后效果（通过事件系统）
+            this.handleTurnEndEffects(currentCharacter);
 
             // 消耗行动值（减去500）
             currentCharacter.consumeAction();
-            
+
+            // 触发行动消耗事件
+            currentCharacter.trigger('action_consumed', {
+                actionValueCost: 500,
+                remainingActionValue: currentCharacter.actionValue
+            });
+
             // 检查是否有额外行动
             if (currentCharacter.hasExtraAction) {
                 // 清除额外行动标志
@@ -138,21 +179,34 @@ class GameState {
                 currentCharacter.actionValue = 500;
                 // 保持角色活跃状态
                 currentCharacter.isActive = true;
-                // 不推进角色，直接返回当前角色
+
+                // 触发额外行动事件
+                currentCharacter.trigger('extra_action_gained', {
+                    actionValue: 500
+                });
+
                 console.log(`=== ${currentCharacter.name} 获得额外行动，继续行动 ===`);
                 return currentCharacter.type === 'ally';
             }
-            
+
             // 标记角色非活跃
             currentCharacter.isActive = false;
+
+            // 触发角色非活跃事件
+            currentCharacter.trigger('character_inactive');
         }
 
         // 推进所有角色的行动值
         this.advanceAllCharacters();
 
+        // 触发全局行动推进事件
+        window.eventSystem.trigger('all_characters_advanced', {
+            turnCount: this.turnCount
+        });
+
         // 获取下一个应该行动的角色
         let nextCharacter = this.getNextCharacter();
-        
+
         // 如果没有角色达到行动值，继续推进直到有人达到
         let iterations = 0;
         const maxIterations = 1000; // 防止无限循环
@@ -160,10 +214,25 @@ class GameState {
             this.advanceAllCharacters();
             nextCharacter = this.getNextCharacter();
             iterations++;
+
+            // 触发推进迭代事件
+            window.eventSystem.trigger('advance_iteration', {
+                iteration: iterations,
+                maxIterations: maxIterations
+            });
         }
 
         if (!nextCharacter) {
             console.error('无法找到下一个行动角色');
+            // 触发无法找到行动角色事件
+            window.eventSystem.trigger('no_next_character_found', {
+                turnCount: this.turnCount,
+                characters: this.getAliveCharacters().map(c => ({
+                    name: c.name,
+                    actionValue: c.actionValue,
+                    speed: c.getActualSpeed()
+                }))
+            });
             return false;
         }
 
@@ -184,6 +253,20 @@ class GameState {
 
         console.log(`=== ${nextCharacter.name} 的回合开始 (行动值: ${nextCharacter.actionValue.toFixed(1)}, 速度: ${nextCharacter.getActualSpeed()}) ===`);
 
+        // 触发回合开始事件
+        nextCharacter.trigger('turn_start', {
+            turnCount: this.turnCount,
+            actionValue: nextCharacter.actionValue,
+            isPlayerTurn: this.isPlayerTurn
+        });
+
+        // 触发全局回合开始事件
+        window.eventSystem.trigger('global_turn_start', {
+            character: nextCharacter,
+            turnCount: this.turnCount,
+            isPlayerTurn: this.isPlayerTurn
+        });
+
         // 处理新回合开始
         this.handleNewTurnStart(nextCharacter);
 
@@ -191,40 +274,78 @@ class GameState {
     }
 
     handleTurnStartEffects(character) {
-        // 重置逾柿的"眼的回想"本回合触发标志
-        if (character.passiveSkills && character.passiveSkills.eyeRecall) {
-            character.passiveSkills.eyeRecall.triggeredThisTurn = false;
-        }
-        
+        // 触发回合开始效果处理事件
+        character.trigger('before_turn_start_effects', {
+            statusEffects: character.statusEffects.filter(effect => effect.triggerTime === 'start')
+        });
+
         // 只处理 triggerTime === 'start' 的效果
         this.processStatusEffects(character, 'start');
+
+        // 触发回合开始效果处理完成事件
+        character.trigger('after_turn_start_effects', {
+            statusEffects: character.statusEffects
+        });
     }
 
     handleTurnEndEffects(character) {
+        // 触发回合结束效果处理事件
+        character.trigger('before_turn_end_effects', {
+            statusEffects: character.statusEffects.filter(effect => effect.triggerTime === 'end')
+        });
+
         // 只处理 triggerTime === 'end' 的效果  
         this.processStatusEffects(character, 'end');
+
+        // 触发回合结束效果处理完成事件
+        character.trigger('after_turn_end_effects', {
+            statusEffects: character.statusEffects
+        });
     }
 
-    // 统一的状态效果处理方法
+    // 统一的状态效果处理方法（事件化版本）
     processStatusEffects(character, triggerTime) {
         const effectsToRemove = [];
-        const effectsToTrigger = []; // 存储需要触发特殊效果的效果
+
+        // 触发状态效果处理开始事件
+        character.trigger('status_effects_processing_start', {
+            triggerTime: triggerTime,
+            statusEffects: character.statusEffects
+        });
 
         character.statusEffects.forEach(effect => {
             if (effect.triggerTime === triggerTime) {
                 console.log(`处理 ${character.name} 的 ${effect.name} (${triggerTime})`);
+
+                // 触发单个状态效果处理事件
+                character.trigger('status_effect_processing', {
+                    effect: effect,
+                    triggerTime: triggerTime
+                });
 
                 // 检查是否需要减少持续时间
                 if (effect.shouldDecrease(character, this.currentTurnIndex, this)) {
                     const oldDuration = effect.duration;
                     effect.duration -= 1;
                     console.log(`  ${effect.name} 持续时间: ${oldDuration} -> ${effect.duration}`);
+
+                    // 触发状态效果持续时间减少事件
+                    character.trigger('status_effect_duration_decreased', {
+                        effect: effect,
+                        oldDuration: oldDuration,
+                        newDuration: effect.duration
+                    });
                 }
 
                 // 检查是否需要移除
                 if (effect.duration <= 0) {
                     effectsToRemove.push(effect);
                     console.log(`  ${effect.name} 效果结束`);
+
+                    // 触发状态效果即将移除事件
+                    character.trigger('status_effect_expiring', {
+                        effect: effect
+                    });
                     
                     // 如果是"下回合给予该隐印记"，标记需要触发
                     if (effect.name === "下回合给予该隐印记") {
@@ -242,6 +363,11 @@ class GameState {
         // 通知效果移除并触发特殊效果
         effectsToRemove.forEach(effect => {
             this.addLog(`${character.name}的【${effect.name}】效果结束了`, 'debuff');
+
+            // 触发状态效果移除事件
+            character.trigger('status_effect_removed', {
+                effect: effect
+            });
             
             // 如果移除的是"该隐印记"，同时移除相关的攻击加成
             if (effect.name === "该隐印记") {
@@ -258,7 +384,7 @@ class GameState {
                 this.grantCainMark(character, count);
             }
         });
-        
+
         // 处理持续治疗效果（回合结束时）
         if (triggerTime === 'end') {
             character.statusEffects.forEach(effect => {
@@ -270,6 +396,14 @@ class GameState {
                     character.currentHp = Math.min(character.maxHp, character.currentHp + healAmount);
                     if (character.currentHp > oldHp) {
                         this.addLog(`${character.name} 受到骑士之道治疗 ${healAmount} 点生命`, 'heal');
+                         // 触发持续治疗事件
+                         character.trigger('hot_healing', {
+                            effect: effect,
+                            healAmount: healAmount,
+                            oldHp: oldHp,
+                            newHp: character.currentHp,
+                            knightCount: knightCount
+                        });
                     }
                 }
                 
@@ -284,20 +418,40 @@ class GameState {
                 }
             });
         }
+
+        // 触发状态效果处理完成事件
+        character.trigger('status_effects_processing_end', {
+            triggerTime: triggerTime,
+            removedEffects: effectsToRemove,
+            remainingEffects: character.statusEffects
+        });
     }
 
-    // 新增方法：处理新回合开始
+    // 新增方法：处理新回合开始（事件化版本）
     handleNewTurnStart(newCharacter) {
         newCharacter.isActive = true;
+
+        // 触发角色激活事件
+        newCharacter.trigger('character_activated', {
+            isActive: true
+        });
 
         // 处理回合开始时的特殊效果（如眩晕）
         newCharacter.statusEffects.forEach(effect => {
             if (effect.triggerTime === 'start' && effect.isStunned) {
                 if (newCharacter.canBeStunned && newCharacter.canBeStunned()) {
                     this.addLog(`${newCharacter.name}被眩晕，无法行动`, 'debuff');
+
+                    // 触发眩晕效果事件
+                    newCharacter.trigger('stun_effect_triggered', {
+                        effect: effect
+                    });
                 }
             }
         });
+
+        // 触发新回合开始处理完成事件
+        newCharacter.trigger('new_turn_start_complete');
         
         // 不再在这里处理"下回合给予该隐印记"，改为在processStatusEffects中当buff消失时触发
 
@@ -411,10 +565,7 @@ class GameState {
             debuff: '#ff8e53'
         };
 
-        this.log.push({ message, color: colors[type] });
-        if (this.log.length > 10) {
-            this.log.shift();
-        }
+        this.log.unshift({ message, color: colors[type] });
     }
 
     resetGame() {
@@ -436,7 +587,7 @@ class GameState {
 
         // 初始化速度条系统
         this.initializeSpeedSystem();
-        
+
         // 设置第一个行动的角色
         let firstCharacter = this.getNextCharacter();
         if (firstCharacter) {

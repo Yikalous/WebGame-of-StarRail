@@ -1,13 +1,14 @@
 class Character {
-    constructor(name, type, maxHp, attack, defense, speed, critRate, critDamage, maxPoint, skills, icon = "🚀", level = 80) {
+    constructor(name, type, maxHp, attack, defense, speed, critRate, critDamage, maxPoint, skills, icon = "🚀", image = '', level = 80) {
         // 生成唯一UUID
         this.uuid = this.generateUUID();
-        
+
         this.name = name;
         this.type = type;
         this.level = level;
         this.maxHp = maxHp;
         this.currentHp = maxHp;
+        this.image = image;
 
         // 基础属性
         this.baseAttack = attack;        // 攻击白值
@@ -116,6 +117,27 @@ class Character {
         return false;
     }
 
+    trigger(eventName, eventData = {}) {
+        // 自动添加角色信息到事件数据中
+        const enhancedData = {
+            ...eventData,
+            source: this,
+            sourceName: this.name,
+            sourceType: this.type,
+            timestamp: Date.now()
+        };
+
+        return window.eventSystem.trigger(eventName, enhancedData);
+    };
+
+    onEvent(eventName, callback, options = {}) {
+        return window.eventSystem.on(eventName, callback, options);
+    };
+
+    onceEvent(eventName, callback, priority = 0) {
+        return window.eventSystem.once(eventName, callback, priority);
+    };
+
     updateStatusEffects() {
         this.statusEffects = this.statusEffects.filter(effect => {
             effect.duration -= 1;
@@ -166,239 +188,248 @@ class Character {
     }
 
     // ===== 通用技能接口 =====
-    // Character.js - 修改 Attack 方法
+    // Character.js - 修复后的完整 Attack 方法
     Attack(type, baseStat = "attack", basenumber = [100], ratio = [1.0], target = this, damageType = DamageType.PHYSICAL, damageStyle = [], times = 1, skillType = SkillType.BASIC) {
         const actualTarget = target || this;
 
-        switch (type) {
-            case "SINGLE":
-                for (let i = 0; i < times; i++) {
-                    let totalDamage = 0;
-                    for (let j = 0; j < basenumber.length; j++) {
-                        totalDamage += basenumber[j] + this.getActualAttack() * ratio[j];
-                    }
+        // 触发攻击前事件
+        const beforeAttackResult = this.trigger('before_attack', {
+            attackType: type,
+            target: actualTarget,
+            damageStyle: damageStyle,
+            damageType: damageType,
+            skillType: skillType
+        });
 
-                    if (actualTarget.currentHp > 0) {
-                        const finalDamage = this.calculateDamage(totalDamage, damageType, skillType, actualTarget);
-                        const survived = actualTarget.takeDamage(finalDamage, damageType, this);
-                        const critText = this.critArea > 1 ? " (暴击!)" : "";
-                        this.Log(`${this.name}对${actualTarget.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
+        // 如果攻击被取消，直接返回
+        if (beforeAttackResult.cancelled) {
+            this.Log(`攻击被取消: ${beforeAttackResult.cancelledBy}`, 'debuff');
+            return;
+        }
 
-                        // 生命吸取和魔力吸取处理
-                        this.statusEffects.forEach(effect => {
-                            if (effect.name === "生命吸取" && effect.value) {
-                                const lifesteal = Math.floor(finalDamage * effect.value);
-                                this.currentHp = Math.min(this.maxHp, this.currentHp + lifesteal);
-                                if (lifesteal > 0) {
-                                    this.Log(`${this.name} 通过生命吸取恢复 ${lifesteal} 点生命`, 'heal');
-                                }
-                            }
-                            if (effect.name === "魔力吸取" && effect.value) {
-                                // 根据造成的伤害和比例回复战技点
-                                const manasteal = effect.value;
-                                if (manasteal > 0) {
-                                    this.gainPoint(manasteal);
-                                    this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
-                                }
-                            }
-                        });
+        // 1. 根据 baseStat 获取基础属性值
+        const getBaseValue = () => {
+            switch (baseStat) {
+                case "attack": return this.getActualAttack();
+                case "defense": return this.getActualDefense();
+                case "maxHp": return this.maxHp;
+                case "currentHp": return this.currentHp;
+                default: return this.getActualAttack();
+            }
+        };
 
-                        if (!survived) {
-                            this.Log(`${actualTarget.name}被击败了！`, 'damage');
-                        }
+        // 2. 计算单次伤害
+        const calculateSingleDamage = (baseValue, baseNum, ratioValue) => {
+            return baseNum + baseValue * ratioValue;
+        };
+
+        // 3. 执行单次攻击
+        const executeSingleAttack = (attackTarget, baseNumIndex = 0, ratioIndex = 0) => {
+            if (!attackTarget || attackTarget.currentHp <= 0) return 0;
+
+            const baseValue = getBaseValue();
+            const baseNum = basenumber[baseNumIndex] || 0;
+            const ratioValue = ratio[ratioIndex] || 0;
+
+            let totalDamage = 0;
+            for (let i = 0; i < times; i++) {
+                const singleDamage = calculateSingleDamage(baseValue, baseNum, ratioValue);
+                totalDamage += singleDamage;
+            }
+
+            const finalDamage = this.calculateDamage(totalDamage, damageType, skillType, attackTarget);
+
+            // 触发攻击事件
+            this.trigger('attack', {
+                attackType: type,
+                target: attackTarget,
+                damage: finalDamage,
+                damageType: damageType,
+                skillType: skillType,
+                isCrit: this.critArea > 1
+            });
+
+            // 执行伤害
+            const survived = attackTarget.takeDamage(finalDamage, damageType, this);
+            const critText = this.critArea > 1 ? " (暴击!)" : "";
+            this.Log(`${this.name}对${attackTarget.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
+
+            if (!survived) {
+                this.Log(`${attackTarget.name}被击败了！`, 'damage');
+            }
+
+            return finalDamage;
+        };
+
+        // 4. 处理生命吸取和魔力吸取
+        const processLifestealAndManasteal = (totalDamage) => {
+            if (totalDamage <= 0) return;
+
+            this.statusEffects.forEach(effect => {
+                if (effect.name === "生命吸取" && effect.value) {
+                    const lifesteal = Math.floor(totalDamage * effect.value);
+                    this.currentHp = Math.min(this.maxHp, this.currentHp + lifesteal);
+                    if (lifesteal > 0) {
+                        this.Log(`${this.name} 通过生命吸取恢复 ${lifesteal} 点生命`, 'heal');
                     }
                 }
+                if (effect.name === "魔力吸取" && effect.value) {
+                    const manasteal = effect.value;
+                    if (manasteal > 0) {
+                        this.gainPoint(manasteal);
+                        this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
+                    }
+                }
+            });
+        };
+
+        // 5. 获取存活的敌人
+        const getAliveEnemies = () => {
+            return this.GetTargets("ALL_ENEMIES").filter(enemy => enemy.currentHp > 0);
+        };
+
+        // 6. 获取相邻目标（修复循环列表问题）
+        const getAdjacentTargets = (enemies, mainIndex) => {
+            const adjacentTargets = [];
+
+            // 只获取直接相邻的目标，不循环
+            if (mainIndex > 0) {
+                adjacentTargets.push(enemies[mainIndex - 1]);
+            }
+            if (mainIndex < enemies.length - 1) {
+                adjacentTargets.push(enemies[mainIndex + 1]);
+            }
+
+            return adjacentTargets.filter(target => target.currentHp > 0);
+        };
+
+        // 主逻辑
+        let totalDamageDealt = 0;
+
+        switch (type) {
+            case "SINGLE":
+                const singleDamage = executeSingleAttack(actualTarget, 0, 0);
+                processLifestealAndManasteal(singleDamage);
                 break;
 
             case "AOE":
-                const enemies = this.GetTargets("ALL_ENEMIES");
-                let totalAoeDamage = 0; // 总伤害统计
-                enemies.forEach(enemy => {
-                    for (let i = 0; i < times; i++) {
-                        let totalDamage = 0;
-                        for (let j = 0; j < basenumber.length; j++) {
-                            totalDamage += basenumber[j] + this.getActualAttack() * ratio[j];
-                        }
+                const aliveEnemies = getAliveEnemies();
+                let aoeTotalDamage = 0;
 
-                        if (enemy.currentHp > 0) {
-                            const finalDamage = this.calculateDamage(totalDamage, damageType, skillType, enemy);
-                            totalAoeDamage += finalDamage; // 累加总伤害
-                            const survived = enemy.takeDamage(finalDamage, damageType, this);
-                            const critText = this.critArea > 1 ? " (暴击!)" : "";
-                            this.Log(`${this.name}对${enemy.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
-
-                            if (!survived) {
-                                this.Log(`${enemy.name}被击败了！`, 'damage');
-                            }
-                        }
-                    }
+                aliveEnemies.forEach(enemy => {
+                    const damage = executeSingleAttack(enemy, 0, 0);
+                    aoeTotalDamage += damage;
                 });
-                
-                // AOE攻击的生命吸取
-                if (totalAoeDamage > 0) {
-                    this.statusEffects.forEach(effect => {
-                        if (effect.name === "生命吸取" && effect.value) {
-                            const lifesteal = Math.floor(totalAoeDamage * effect.value);
-                            this.currentHp = Math.min(this.maxHp, this.currentHp + lifesteal);
-                            if (lifesteal > 0) {
-                                this.Log(`${this.name} 通过生命吸取恢复 ${lifesteal} 点生命`, 'heal');
-                            }
-                        }
-                        if (effect.name === "魔力吸取" && effect.value) {
-                            // AOE攻击：根据总伤害和比例回复战技点
-                            const manasteal =  effect.value;
-                            if (manasteal > 0) {
-                                this.gainPoint(manasteal);
-                                this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
-                            }
-                        }
-                    });
-                }
+
+                processLifestealAndManasteal(aoeTotalDamage);
                 break;
 
             case "BOUND":
-                const allEnemies = this.GetTargets("ALL_ENEMIES");
-                if (allEnemies.length === 0) {
+                const boundEnemies = getAliveEnemies();
+                if (boundEnemies.length === 0) {
                     this.Log("没有可攻击的敌人", 'debuff');
                     return;
                 }
 
                 this.Log(`${this.name} 发动弹射攻击！`, 'damage');
+                let boundTotalDamage = 0;
 
-                let totalBoundDamage = 0; // 总伤害统计
                 for (let i = 0; i < times; i++) {
-                    const randomIndex = Math.floor(Math.random() * allEnemies.length);
-                    const randomTarget = allEnemies[randomIndex];
+                    // 从存活敌人中随机选择
+                    const availableTargets = boundEnemies.filter(enemy => enemy.currentHp > 0);
+                    if (availableTargets.length === 0) break;
 
-                    let totalDamage = 0;
-                    for (let j = 0; j < basenumber.length; j++) {
-                        totalDamage += basenumber[j] + this.getActualAttack() * ratio[j];
-                    }
+                    const randomIndex = Math.floor(Math.random() * availableTargets.length);
+                    const randomTarget = availableTargets[randomIndex];
 
-                    if (randomTarget.currentHp > 0) {
-                        const finalDamage = this.calculateDamage(totalDamage, damageType, skillType, randomTarget);
-                        totalBoundDamage += finalDamage; // 累加总伤害
-                        const survived = randomTarget.takeDamage(finalDamage, damageType, this);
-                        const critText = this.critArea > 1 ? " (暴击!)" : "";
-                        this.Log(`第${i + 1}段弹射对${randomTarget.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
+                    const baseValue = getBaseValue();
+                    const baseNum = basenumber[0] || 0;
+                    const ratioValue = ratio[0] || 0;
+                    const singleDamage = calculateSingleDamage(baseValue, baseNum, ratioValue);
+                    const finalDamage = this.calculateDamage(singleDamage, damageType, skillType, randomTarget);
 
-                        if (!survived) {
-                            this.Log(`${randomTarget.name}被击败了！`, 'damage');
-                        }
-                    }
-                }
-                
-                // BOUND攻击的生命吸取
-                if (totalBoundDamage > 0) {
-                    this.statusEffects.forEach(effect => {
-                        if (effect.name === "生命吸取" && effect.value) {
-                            const lifesteal = effect.value;
-                            this.currentHp = Math.min(this.maxHp, this.currentHp + lifesteal);
-                            if (lifesteal > 0) {
-                                this.Log(`${this.name} 通过生命吸取恢复 ${lifesteal} 点生命`, 'heal');
-                            }
-                        }
-                        if (effect.name === "魔力吸取" && effect.value) {
-                            // BOUND攻击：根据总伤害和比例回复战技点
-                            const manasteal =  effect.value;
-                            if (manasteal > 0) {
-                                this.gainPoint(manasteal);
-                                this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
-                            }
-                        }
+                    // 触发攻击事件
+                    this.trigger('attack', {
+                        attackType: type,
+                        target: randomTarget,
+                        damage: finalDamage,
+                        damageType: damageType,
+                        skillType: skillType,
+                        isCrit: this.critArea > 1
                     });
+
+                    const survived = randomTarget.takeDamage(finalDamage, damageType, this);
+                    const critText = this.critArea > 1 ? " (暴击!)" : "";
+                    this.Log(`第${i + 1}段弹射对${randomTarget.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
+
+                    if (!survived) {
+                        this.Log(`${randomTarget.name}被击败了！`, 'damage');
+                    }
+
+                    boundTotalDamage += finalDamage;
                 }
+
+                processLifestealAndManasteal(boundTotalDamage);
                 break;
 
             case "SPREAD":
-                const SpreadEnemies = this.GetTargets("ALL_ENEMIES");
-                if (SpreadEnemies.length === 0) {
+                const spreadEnemies = getAliveEnemies();
+                if (spreadEnemies.length === 0) {
                     this.Log("没有可攻击的敌人", 'debuff');
                     return;
                 }
 
-                // 找到主目标在敌人列表中的位置
-                const mainTargetIndex = SpreadEnemies.findIndex(enemy => enemy === actualTarget);
+                // 找到主目标在存活敌人列表中的位置
+                const mainTargetIndex = spreadEnemies.findIndex(enemy => enemy === actualTarget && enemy.currentHp > 0);
                 if (mainTargetIndex === -1) {
-                    this.Log("主目标无效", 'debuff');
+                    this.Log("主目标无效或已死亡", 'debuff');
                     return;
                 }
 
                 this.Log(`${this.name} 发动扩散攻击！`, 'damage');
-
-                let totalSpreadDamage = 0; // 总伤害统计
+                let spreadTotalDamage = 0;
 
                 // 对主目标造成伤害（使用第一个倍率）
-                for (let i = 0; i < times; i++) {
-                    let mainDamage = 0;
-                    const mainBase = basenumber[0] || 0;
-                    const mainRatio = ratio[0] || 0;
-                    mainDamage += mainBase + this.getActualAttack() * mainRatio;
-
-                    if (actualTarget.currentHp > 0) {
-                        const finalMainDamage = this.calculateDamage(mainDamage, damageType, skillType, actualTarget);
-                        totalSpreadDamage += finalMainDamage; // 累加总伤害
-                        const survived = actualTarget.takeDamage(finalMainDamage, damageType, this);
-                        const critText = this.critArea > 1 ? " (暴击!)" : "";
-                        this.Log(`${this.name}对${actualTarget.name}造成${finalMainDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
-
-                        if (!survived) {
-                            this.Log(`${actualTarget.name}被击败了！`, 'damage');
-                        }
-                    }
-                }
+                const mainDamage = executeSingleAttack(actualTarget, 0, 0);
+                spreadTotalDamage += mainDamage;
 
                 // 对相邻目标造成伤害（使用第二个倍率）
-                const adjacentTargets = this.getAdjacentTargets(SpreadEnemies, mainTargetIndex);
+                const adjacentTargets = getAdjacentTargets(spreadEnemies, mainTargetIndex);
 
                 adjacentTargets.forEach(adjacentTarget => {
-                    for (let i = 0; i < times; i++) {
-                        let spreadDamage = 0;
-                        const spreadBase = basenumber[1] || (basenumber[0] || 0); // 如果没有第二个倍率，使用第一个
-                        const spreadRatio = ratio[1] || (ratio[0] || 0); // 如果没有第二个倍率，使用第一个
-                        spreadDamage += spreadBase + this.getActualAttack() * spreadRatio;
+                    const baseValue = getBaseValue();
+                    const baseNum = basenumber[1] || (basenumber[0] || 0);
+                    const ratioValue = ratio[1] || (ratio[0] || 0);
+                    const singleDamage = calculateSingleDamage(baseValue, baseNum, ratioValue);
+                    const finalDamage = this.calculateDamage(singleDamage, damageType, skillType, adjacentTarget);
 
-                        if (adjacentTarget.currentHp > 0) {
-                            const finalSpreadDamage = this.calculateDamage(spreadDamage, damageType, skillType, adjacentTarget);
-                            totalSpreadDamage += finalSpreadDamage; // 累加总伤害
-                            const survived = adjacentTarget.takeDamage(finalSpreadDamage, damageType, this);
-                            const critText = this.critArea > 1 ? " (暴击!)" : "";
-                            this.Log(`扩散对${adjacentTarget.name}造成${finalSpreadDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
-
-                            if (!survived) {
-                                this.Log(`${adjacentTarget.name}被击败了！`, 'damage');
-                            }
-                        }
-                    }
-                });
-                
-                // SPREAD攻击的生命吸取处理（基于总伤害）
-                if (totalSpreadDamage > 0) {
-                    this.statusEffects.forEach(effect => {
-                        if (effect.name === "生命吸取" && effect.value) {
-                            const lifesteal =  effect.value;
-                            this.currentHp = Math.min(this.maxHp, this.currentHp + lifesteal);
-                            if (lifesteal > 0) {
-                                this.Log(`${this.name} 通过生命吸取恢复 ${lifesteal} 点生命`, 'heal');
-                            }
-                        }
-                        if (effect.name === "魔力吸取" && effect.value) {
-                            // SPREAD攻击：根据总伤害和比例回复战技点
-                            const manasteal =  effect.value;
-                            if (manasteal > 0) {
-                                this.gainPoint(manasteal);
-                                this.Log(`${this.name} 通过魔力吸取恢复 ${manasteal} 点战技点`, 'Point');
-                            }
-                        }
+                    // 触发攻击事件
+                    this.trigger('attack', {
+                        attackType: type,
+                        target: adjacentTarget,
+                        damage: finalDamage,
+                        damageType: damageType,
+                        skillType: skillType,
+                        isCrit: this.critArea > 1
                     });
-                }
+
+                    const survived = adjacentTarget.takeDamage(finalDamage, damageType, this);
+                    const critText = this.critArea > 1 ? " (暴击!)" : "";
+                    this.Log(`扩散对${adjacentTarget.name}造成${finalDamage}${critText}点${this.getDamageTypeText(damageType)}伤害`, 'damage');
+
+                    if (!survived) {
+                        this.Log(`${adjacentTarget.name}被击败了！`, 'damage');
+                    }
+
+                    spreadTotalDamage += finalDamage;
+                });
+
+                processLifestealAndManasteal(spreadTotalDamage);
                 break;
 
             default:
                 console.warn(`未知的攻击类型: ${type}`);
         }
-        
-
     }
 
     getAdjacentTargets(enemies, mainIndex) {
@@ -447,8 +478,14 @@ class Character {
     }
 
     // Character.js - 更新 takeDamage 方法
-    takeDamage(amount, type, attacker = null) {
+    takeDamage(amount, type, source = null) {
         // 免疫死亡状态检查（检查免疫致命伤次数）
+        this.trigger('before_take_damage', {
+            damage: amount,
+            damageType: type,
+            source: source
+        });
+
         let isFatalDamage = amount >= this.currentHp;
         let wasImmuneDeath = false;
         
@@ -456,34 +493,7 @@ class Character {
             // 优先检查"眼的回想"被动技能（眼的回想应该优先于免疫死亡触发）
             if (this.passiveSkills && this.passiveSkills.eyeRecall) {
                 const eyeRecall = this.passiveSkills.eyeRecall;
-                if (eyeRecall.onFatalDamage && typeof eyeRecall.onFatalDamage === 'function') {
-                    const saved = eyeRecall.onFatalDamage(this, this.gameState ? this.gameState.characters : []);
-                    if (saved) {
-                        this.currentHp = 1;
-                        return true; // 成功触发眼的回想，保持1血
-                    }
-                }
-            }
-            
-            // 如果眼的回想没有触发，检查免疫死亡状态
-            const immuneEffects = this.statusEffects.filter(e => e.isImmuneDeath);
-            if (immuneEffects.length > 0) {
-                // 消耗一次免疫致命伤
-                const immuneEffect = immuneEffects[0];
-                if (immuneEffect.value === undefined || immuneEffect.value > 0) {
-                    immuneEffect.value = (immuneEffect.value || 1) - 1;
-                    if (immuneEffect.value <= 0) {
-                        // 移除效果
-                        this.statusEffects = this.statusEffects.filter(e => e !== immuneEffect);
-                    }
-                    this.currentHp = 1;
-                    wasImmuneDeath = true;
-                    this.Log(`${this.name} 免疫了致命伤害！`, 'buff');
-                    
-                    // 免疫死亡也算触发致死伤害，标记triggeredThisTurn（如果满足条件），使终结技能够触发
-                    // 注意：此时currentHp已被设置为1，所以检查时需要考虑这一点
-                    if (this.passiveSkills && this.passiveSkills.eyeRecall) {
-                        const eyeRecall = this.passiveSkills.eyeRecall;
+                const eyeRecall = this.passiveSkills.eyeRecall;
                         // 检查队友是否全部存活（眼的回想的触发条件，不包括自己）
                         if (this.gameState) {
                             const allAllies = this.gameState.getAllies(); // 所有初始上场的友方
@@ -498,9 +508,22 @@ class Character {
                                 eyeRecall.triggeredThisTurn = true;
                                 this.Log(`${this.name} 免疫致命伤害，触发眼的回想标记（可用于终结技）`, 'buff');
                             }
-                        }
+            }
+            
+            // 如果眼的回想没有触发，检查免疫死亡状态
+            if (isFatalDamage) {
+            const immuneEffects = this.statusEffects.filter(e => e.isImmuneDeath);
+            if (immuneEffects.length > 0) {
+                // 消耗一次免疫致命伤
+                const immuneEffect = immuneEffects[0];
+                if (immuneEffect.value === undefined || immuneEffect.value > 0) {
+                    immuneEffect.value = (immuneEffect.value || 1) - 1;
+                    if (immuneEffect.value <= 0) {
+                        // 移除效果
+                        this.statusEffects = this.statusEffects.filter(e => e !== immuneEffect);
                     }
-                    
+                    this.currentHp = 1;
+                    this.Log(`${this.name} 免疫了致命伤害！`, 'buff');
                     return true;
                 }
             }
@@ -520,14 +543,13 @@ class Character {
                 attacker.extraActionCount += 2; // 下两回合可多行动一次
                 this.gameState.addLog(`${attacker.name} 击杀了 ${this.name}，获得下两回合额外行动机会！`, 'buff');
             }
-            
-            // 检测友方死亡，触发被动技能
+                // 检测友方死亡，触发被动技能
             if (this.type === 'ally') {
                 // 检查是否有荒弥在场，触发被动技能
-                const huangmi = this.gameState.characters.find(c => 
+                const huangmi = this.gameState.characters.find(c =>
                     c.name === "荒弥" && c.currentHp > 0 && c.passiveSkills && c.passiveSkills.limpingAlone
                 );
-                
+    
                 if (huangmi && huangmi.passiveSkills.limpingAlone) {
                     huangmi.passiveSkills.limpingAlone.onAllyDeath(huangmi, this, this.gameState.characters);
                 }
@@ -540,7 +562,24 @@ class Character {
                 }
             }
         }
-        
+
+        this.trigger('take_damage', {
+            damage: amount,
+            damageType: type,
+            source: source,
+            survived: survived
+        });
+
+        if (source) {
+            // 触发造成伤害的事件
+            source.trigger('deal_damage', {
+                damage: amount,
+                damageType: type,
+                target: this,
+                survived: survived
+            });
+        }
+
         return survived;
     }
 
@@ -873,7 +912,7 @@ class Character {
             case "shock":
                 effect.isShocked = true;
                 break;
-            
+
             // === 自定义效果类型 ===
             case "damageReduction":
                 effect.damageReduction = value;
@@ -898,7 +937,6 @@ class Character {
         const existingIndex = this.statusEffects.findIndex(eff => eff.name === name);
         if (existingIndex !== -1) {
             this.statusEffects[existingIndex] = effect;
-            this.Log(`${this.name}的状态【${name}】已更新`, 'buff');
         } else {
             this.statusEffects.push(effect);
             this.Log(`${this.name}获得状态【${name}】`, 'buff');

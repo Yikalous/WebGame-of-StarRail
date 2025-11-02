@@ -71,6 +71,12 @@
     margin-bottom: 10px;
 }
 
+.card-icon-img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+}
+
 .card-name {
     font-size: 1.3rem;
     font-weight: bold;
@@ -134,8 +140,7 @@
 .selected-item {
     background: rgba(0, 255, 136, 0.2);
     border: 1px solid #00ff88;
-    border-radius: 10px;
-    padding: 10px 15px;
+    padding-left:10px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -144,6 +149,13 @@
 
 .selected-icon {
     font-size: 1.5rem;
+}
+
+.selected-icon-img {
+    margin-top:10px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
 }
 
 .selected-name {

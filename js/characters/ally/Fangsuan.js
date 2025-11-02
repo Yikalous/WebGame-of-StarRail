@@ -12,10 +12,11 @@
         critDamage: 0.8,
         maxPoint: 5,
         icon: "🧙",
+        image: "./images/characters/ally/Fangsuan.jpeg",
         skills: [
             {
-                name: "平凡一击",
-                description: "对敌方主目标造成量子伤害",
+                name: "量子共鸣",
+                description: "对敌方单体造成2000+300%攻击力的伤害。释放技能后，持续到本局结束。当友方造成伤害时，有90%概率附加1000+100%攻击力的伤害",
                 targetType: TargetType.SINGLE,
                 skillType: SkillType.BASIC,
                 damageType: DamageType.QUANTUM,
@@ -23,13 +24,35 @@
                 icon: "⚔️",
                 PointCost: -3,
                 executeFunc: function (user, target, allCharacters) {
-                    const enemies = allCharacters.filter(c => c.type === 'enemy' && c.currentHp > 0);
-                    const actualTarget = target || (enemies.length > 0 ? enemies[0] : null);
+                    // 1. 先执行基础攻击
+                    user.Attack("SINGLE", "attack", [2000], [3.0], target, DamageType.QUANTUM, [DamageStyle.BASIC]);
 
-                    if (actualTarget) {
-                        user.Attack("SINGLE", "attack", [1100], [3.0], actualTarget, DamageType.QUANTUM, [DamageStyle.BASIC]);
-                    } else {
-                        user.Log("没有可攻击的目标", 'debuff');
+                    // 2. 检查是否已经注册过监听器（避免重复注册）
+                    if (!user.quantumResonanceHandler) {
+                        user.quantumResonanceHandler = (event) => {
+                            const { source, target: damageTarget, damage, skillType } = event.data;
+
+                            // 排除自己造成的伤害，只监听友方（包括自己以外的友方）
+                            if (source === user || source.type !== 'ally') return;
+
+                            // 90%概率触发量子共鸣
+                            if (Math.random() < 0.9) {
+                                // 计算附加伤害：1000 + 100%攻击力
+                                const additionalDamage = 1000 + user.getActualAttack() * 1.0;
+                                const finalAdditionalDamage = user.calculateDamage(additionalDamage, DamageType.QUANTUM, SkillType.SPECIAL, damageTarget);
+
+                                // 造成附加伤害
+                                const survived = damageTarget.takeDamage(finalAdditionalDamage, DamageType.QUANTUM, user);
+                                user.Log(`${user.name} 的量子共鸣对${damageTarget.name}造成${finalAdditionalDamage}点附加量子伤害！`, 'buff');
+
+                                if (!survived) {
+                                    user.Log(`${damageTarget.name}被量子共鸣击败！`, 'damage');
+                                }
+                            }
+                        };
+
+                        // 注册事件监听器
+                        user.onEvent('deal_damage', user.quantumResonanceHandler);
                     }
                 }
             },
@@ -72,7 +95,7 @@
 
                     allCharacters.forEach(c => {
                         if (c.type === 'enemy') {
-                            c.addStatusEffect("死之剑的诅咒", "damageTakenBonus", 10.0, 3, 'self', 'end');
+                            c.addStatusEffect("死之剑的诅咒", "damageTakenBonus", 1.0, 3, 'self', 'end');
                         }
                     });
 
