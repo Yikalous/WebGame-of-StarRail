@@ -14,7 +14,7 @@ class GameState {
         // 初始化全局回合事件监听器
         this.initializeTurnEventListeners();
     }
-    
+
     initializeTurnEventListeners() {
         // 监听全局回合开始事件
         window.eventSystem.on('global_turn_start', (event) => {
@@ -463,7 +463,7 @@ class GameState {
             debuff: '#ff8e53'
         };
 
-        this.log.push({ message, color: colors[type] });
+        this.log.unshift({ message, color: colors[type] });
     }
 
     resetGame() {

@@ -60,7 +60,8 @@ class CharacterLoader {
             template.critDamage,
             template.maxPoint,
             skills,
-            template.icon
+            template.icon,
+            template.image || "",
         );
         
         // 添加被动技能（如果模板中有定义）

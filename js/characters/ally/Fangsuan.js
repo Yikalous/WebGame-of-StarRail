@@ -11,6 +11,7 @@
         critDamage: 0.8,
         maxPoint: 5,
         icon: "🧙",
+        image: "./images/characters/ally/Fangsuan.jpeg",
         skills: [
             {
                 name: "量子共鸣",

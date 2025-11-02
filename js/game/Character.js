@@ -1,5 +1,5 @@
 class Character {
-    constructor(name, type, maxHp, attack, defense, speed, critRate, critDamage, maxPoint, skills, icon = "🚀", level = 80) {
+    constructor(name, type, maxHp, attack, defense, speed, critRate, critDamage, maxPoint, skills, icon = "🚀", image = '', level = 80) {
         // 生成唯一UUID
         this.uuid = this.generateUUID();
 
@@ -8,6 +8,7 @@ class Character {
         this.level = level;
         this.maxHp = maxHp;
         this.currentHp = maxHp;
+        this.image = image;
 
         // 基础属性
         this.baseAttack = attack;        // 攻击白值
