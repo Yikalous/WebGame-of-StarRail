@@ -487,39 +487,80 @@ class Character {
         });
 
         let isFatalDamage = amount >= this.currentHp;
-        let wasImmuneDeath = false;
         
         if (isFatalDamage) {
-            // 优先检查"眼的回想"被动技能（眼的回想应该优先于免疫死亡触发）
-            if (this.passiveSkills && this.passiveSkills.eyeRecall) {
-                const eyeRecall = this.passiveSkills.eyeRecall;
-                const eyeRecall = this.passiveSkills.eyeRecall;
-                        // 检查队友是否全部存活（眼的回想的触发条件，不包括自己）
-                        if (this.gameState) {
-                            const allAllies = this.gameState.getAllies(); // 所有初始上场的友方
-                            // 检查除自己外的所有友方，包括自己（因为此时自己HP=1，还活着）
-                            const aliveAllies = allAllies.filter(c => c !== this && c.currentHp > 0); // 除自己外存活的友方
-                            const totalOtherAllies = allAllies.filter(c => c !== this).length; // 除自己外所有友方数量
-                            
-                            // 如果除自己外的所有队友都存活，标记triggeredThisTurn
-                            const allAlive = aliveAllies.length === totalOtherAllies && totalOtherAllies > 0;
-                            
-                            if (allAlive) {
-                                eyeRecall.triggeredThisTurn = true;
-                                this.Log(`${this.name} 免疫致命伤害，触发眼的回想标记（可用于终结技）`, 'buff');
-                            }
+            // 触发致命伤害前事件
+            const beforeFatalResult = this.trigger('before_fatal_damage', {
+                damage: amount,
+                damageType: type,
+                source: source
+            });
+            
+            // 如果事件被取消，直接返回
+            if (beforeFatalResult.cancelled) {
+                return true;
             }
             
-            // 如果眼的回想没有触发，检查免疫死亡状态
-            if (isFatalDamage) {
-            const immuneEffects = this.statusEffects.filter(e => e.isImmuneDeath);
-            if (immuneEffects.length > 0) {
-                // 消耗一次免疫致命伤
-                const immuneEffect = immuneEffects[0];
+            // 特殊处理：逾柿的"眼的回想"buff
+            if (this.name === "逾柿" && this.gameState) {
+                // 检查"眼的回想"buff是否存在
+                let eyeRecallEffect = this.statusEffects.find(e => e.name === "眼的回想");
+                
+                // 如果不存在，检查条件并创建
+                if (!eyeRecallEffect) {
+                    // 检查所有上场队友是否全部存活（不包括逾柿自己）
+                    const allAllies = this.gameState.getAllies();
+                    const aliveAllies = allAllies.filter(c => c.currentHp > 0 && c !== this);
+                    const totalOtherAllies = allAllies.filter(c => c !== this).length;
+                    
+                    // 如果除逾柿外的所有队友都存活，则创建buff
+                    const allAlive = aliveAllies.length === totalOtherAllies && totalOtherAllies > 0;
+                    
+                    if (allAlive) {
+                        // 创建"眼的回想"buff，持续时间无限，带一次免疫致命伤害
+                        eyeRecallEffect = new StatusEffect("眼的回想", 999);
+                        eyeRecallEffect.turnType = 'self';
+                        eyeRecallEffect.triggerTime = 'end';
+                        eyeRecallEffect.owner = this;
+                        eyeRecallEffect.isImmuneDeath = true;
+                        eyeRecallEffect.value = 1; // 免疫次数：1次
+                        eyeRecallEffect.appliedTurn = this.gameState?.turnCount || 0;
+                        // 设置 shouldDecrease 为 false，使其不会减少持续时间
+                        eyeRecallEffect.shouldDecrease = function() { return false; };
+                        this.statusEffects.push(eyeRecallEffect);
+                        
+                        this.Log(`${this.name} 获得【眼的回想】状态！`, 'buff');
+                    }
+                }
+                
+                // 检测"眼的回想"buff的免疫是否可用（全局一次）
+                if (eyeRecallEffect && eyeRecallEffect.isImmuneDeath && 
+                    (eyeRecallEffect.value === undefined || eyeRecallEffect.value > 0)) {
+                    // 触发免疫，锁血为1
+                    eyeRecallEffect.value = (eyeRecallEffect.value || 1) - 1;
+                    
+                    // 免疫次数用完后，移除免疫效果标记但保留buff
+                    if (eyeRecallEffect.value <= 0) {
+                        eyeRecallEffect.isImmuneDeath = false;
+                    }
+                    
+                    this.currentHp = 1;
+                    this.Log(`${this.name} 的【眼的回想】触发！免疫致命伤害，血量保持在1`, 'buff');
+                    return true;
+                }
+            }
+            
+            // 检查其他免疫死亡状态
+            const otherImmuneEffects = this.statusEffects.filter(e => e.isImmuneDeath && 
+                e.name !== "眼的回想" && (e.value === undefined || e.value > 0));
+            
+            if (otherImmuneEffects.length > 0) {
+                const immuneEffect = otherImmuneEffects[0];
                 if (immuneEffect.value === undefined || immuneEffect.value > 0) {
                     immuneEffect.value = (immuneEffect.value || 1) - 1;
+                    
                     if (immuneEffect.value <= 0) {
-                        // 移除效果
+                        // 其他免疫效果，移除整个效果
                         this.statusEffects = this.statusEffects.filter(e => e !== immuneEffect);
                     }
                     this.currentHp = 1;
@@ -532,35 +573,24 @@ class Character {
         this.currentHp = Math.max(0, this.currentHp - amount);
         const survived = this.currentHp > 0;
         
-        // 检测角色死亡
+        // 检测角色死亡 - 使用事件系统
         if (!survived && this.gameState) {
-            // 检查是否被队友击杀（逾柿的特殊机制）
-            if (this.name === "逾柿" && attacker && attacker.type === 'ally' && attacker !== this) {
-                // 队友击杀逾柿，给予额外行动机会
-                if (!attacker.extraActionCount) {
-                    attacker.extraActionCount = 0;
-                }
-                attacker.extraActionCount += 2; // 下两回合可多行动一次
-                this.gameState.addLog(`${attacker.name} 击杀了 ${this.name}，获得下两回合额外行动机会！`, 'buff');
-            }
-                // 检测友方死亡，触发被动技能
-            if (this.type === 'ally') {
-                // 检查是否有荒弥在场，触发被动技能
-                const huangmi = this.gameState.characters.find(c =>
-                    c.name === "荒弥" && c.currentHp > 0 && c.passiveSkills && c.passiveSkills.limpingAlone
-                );
-    
-                if (huangmi && huangmi.passiveSkills.limpingAlone) {
-                    huangmi.passiveSkills.limpingAlone.onAllyDeath(huangmi, this, this.gameState.characters);
-                }
-                
-                // 检查逾柿的亡语效果
-                if (this.name === "逾柿" && this.passiveSkills && this.passiveSkills.deathRattle) {
-                    // 标记死亡，启动亡语效果
-                    this.isDead = true;
-                    this.deathRattleActive = true;
-                }
-            }
+            // 触发角色死亡事件
+            this.trigger('character_death', {
+                source: source,
+                damageType: type,
+                killedBy: source,
+                isAlly: this.type === 'ally'
+            });
+            
+            // 同时触发全局角色死亡事件
+            window.eventSystem.trigger('character_death', {
+                character: this,
+                source: source,
+                damageType: type,
+                killedBy: source,
+                isAlly: this.type === 'ally'
+            });
         }
 
         this.trigger('take_damage', {

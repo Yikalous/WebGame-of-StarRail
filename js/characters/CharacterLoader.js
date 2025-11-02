@@ -77,36 +77,13 @@ class CharacterLoader {
             // 从原始模板中保存函数引用（因为 JSON 序列化会丢失函数）
             const templatePassiveSkills = template.passiveSkills;
             
-            // 绑定荒弥的被动技能
-            if (character.passiveSkills && character.passiveSkills.limpingAlone && templatePassiveSkills.limpingAlone) {
-                const limpingAlone = character.passiveSkills.limpingAlone;
-                const originalOnAllyDeath = templatePassiveSkills.limpingAlone.onAllyDeath; // 从模板中获取原始函数
-                if (originalOnAllyDeath && typeof originalOnAllyDeath === 'function') {
-                    character.passiveSkills.limpingAlone.onAllyDeath = function(huangmi, deadAlly, allCharacters) {
-                        return originalOnAllyDeath.call(limpingAlone, huangmi, deadAlly, allCharacters);
-                    };
-                }
-            }
-            
-            // 绑定逾柿的被动技能
-            if (character.passiveSkills && character.passiveSkills.eyeRecall && templatePassiveSkills.eyeRecall) {
-                const eyeRecall = character.passiveSkills.eyeRecall;
-                const originalOnFatalDamage = templatePassiveSkills.eyeRecall.onFatalDamage; // 从模板中获取原始函数
-                if (originalOnFatalDamage && typeof originalOnFatalDamage === 'function') {
-                    character.passiveSkills.eyeRecall.onFatalDamage = function(yushi, allCharacters) {
-                        return originalOnFatalDamage.call(eyeRecall, yushi, allCharacters);
-                    };
-                }
-            }
-            
-            // 绑定逾柿的亡语效果
-            if (character.passiveSkills && character.passiveSkills.deathRattle && templatePassiveSkills.deathRattle) {
-                const deathRattle = character.passiveSkills.deathRattle;
-                const originalOnTurnStart = templatePassiveSkills.deathRattle.onTurnStart; // 从模板中获取原始函数
-                if (originalOnTurnStart && typeof originalOnTurnStart === 'function') {
-                    character.passiveSkills.deathRattle.onTurnStart = function(yushi, allCharacters, gameState) {
-                        return originalOnTurnStart.call(deathRattle, yushi, allCharacters, gameState);
-                    };
+            // 初始化事件监听器（如果存在 initializeEvents 方法）
+            // 支持逾柿和荒弥等角色的事件初始化
+            if (character.passiveSkills && character.passiveSkills.initializeEvents && templatePassiveSkills.initializeEvents) {
+                const initializeEvents = templatePassiveSkills.initializeEvents;
+                if (typeof initializeEvents === 'function') {
+                    // 在角色创建后初始化事件监听器
+                    initializeEvents.call(character.passiveSkills, character);
                 }
             }
         }

@@ -67,8 +67,8 @@
                     
                     user.Log(`${user.name} 向 ${actualTarget.name} 发起决斗！`, 'buff');
                     
-                    // 对目标造成物理伤害
-                    user.Attack("SINGLE", "attack", [800], [2.0], actualTarget, DamageType.IMAGINARY, 1, SkillType.SKILL);
+                    // 对目标造成虚数伤害
+                    user.Attack("SINGLE", "attack", [800], [2.0], actualTarget, DamageType.IMAGINARY, [], 1, SkillType.SKILL);
                     
                     if (userActualSpeed > targetActualSpeed) {
                         // 速度高于敌方：立即再次行动一次，速度-10，友方最高速+10
@@ -173,7 +173,14 @@
                         // 设置新的攻击力和生命上限
                         ally.baseAttack = finalAttack;
                         ally.maxHp = finalMaxHp;
-                        ally.currentHp = Math.floor(finalMaxHp * hpPercent);
+                        
+                        // 计算新的HP，但要确保至少为1（避免低血量角色死亡）
+                        let newHp = Math.floor(finalMaxHp * hpPercent);
+                        // 如果原来HP大于0，确保新HP至少为1；如果原来HP为0，则保持为0
+                        if (ally.currentHp > 0 && newHp <= 0) {
+                            newHp = 1;
+                        }
+                        ally.currentHp = newHp;
                         
                         // 添加状态效果标记，持续2回合（使用已存在的类型作为标记）
                         ally.addStatusEffect("荣耀的统一", "damageBonus", 0, 5, 'self', 'end');
@@ -303,13 +310,27 @@
             },
         ],
         
-        // 添加被动技能属性
+        // 被动技能（使用事件系统初始化）
         passiveSkills: {
             // 蹒跚独行
             limpingAlone: {
                 deathCount: 0, // 死亡计数
-                maxStacks: 10, // 最高叠加10次
-                onAllyDeath: function(huangmi, deadAlly, allCharacters) {
+                maxStacks: 10 // 最高叠加10次
+            },
+            
+            // 初始化事件监听器（在 CharacterLoader 中调用）
+            initializeEvents: function(huangmi) {
+                const limpingAlone = huangmi.passiveSkills.limpingAlone;
+                
+                // 监听全局角色死亡事件
+                window.eventSystem.on('character_death', function(event) {
+                    const { character, isAlly } = event.data;
+                    
+                    // 只处理友方死亡
+                    if (!isAlly || character === huangmi) {
+                        return;
+                    }
+                    
                     // 自身减少当前3%生命上限
                     const hpReduction = Math.floor(huangmi.maxHp * 0.03);
                     const oldMaxHp = huangmi.maxHp;
@@ -319,13 +340,14 @@
                     huangmi.Log(`${huangmi.name} 因队友死亡失去 ${hpReduction} 点生命上限`, 'debuff');
                     
                     // 提高全体队友6%攻击力（叠加，最高10次）
-                    if (this.deathCount < this.maxStacks) {
-                        this.deathCount++;
+                    if (limpingAlone.deathCount < limpingAlone.maxStacks) {
+                        limpingAlone.deathCount++;
+                        const allCharacters = huangmi.gameState.characters;
                         const allies = allCharacters.filter(c => c.type === 'ally' && c.currentHp > 0 && c !== huangmi);
                         
                         allies.forEach(ally => {
                             // 通过状态效果增加攻击力
-                            const stackCount = Math.min(this.deathCount, this.maxStacks);
+                            const stackCount = Math.min(limpingAlone.deathCount, limpingAlone.maxStacks);
                             const attackBonus = 0.06 * stackCount;
                             
                             // 移除旧的叠加效果（如果存在）
@@ -360,7 +382,7 @@
                             effect.uses = (effect.uses || 0) + 1;
                         }
                     }
-                }
+                });
             }
         }
     };

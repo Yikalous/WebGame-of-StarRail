@@ -139,6 +139,14 @@ console.log("加载角色图片：", character.name, character.image);
         if (effect.isShocked) lines.push('● 受到伤害增加');
 
         // 特殊效果描述（基于效果名称）
+        if (effect.name === "眼的回想") {
+            if (effect.isImmuneDeath && (effect.value === undefined || effect.value > 0)) {
+                lines.push('● 可以免疫一次致命伤害（整局限一次）');
+            } else {
+                lines.push('● 已使用免疫致命伤害效果');
+            }
+            lines.push('● 释放终结技时，可使自身和任意两名队友获得该隐印记');
+        }
         if (effect.name === "生命吸取" && effect.value) {
             lines.push(`● 造成伤害时回复${(effect.value * 100).toFixed(0)}%伤害量的生命值`);
         }

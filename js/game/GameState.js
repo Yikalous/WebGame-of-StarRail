@@ -44,6 +44,21 @@ class GameState {
     addCharacter(character) {
         character.gameState = this;  // 这里设置 gameState 引用
         this.characters.push(character);
+        
+        // 如果角色有initializeEvents方法且gameState已设置，在这里初始化事件监听器
+        // （因为initializeEvents需要gameState才能正常工作）
+        if (character.passiveSkills && character.passiveSkills.initializeEvents && 
+            character.gameState && typeof character.passiveSkills.initializeEvents === 'function') {
+            // 检查是否已经初始化过（通过检查是否有事件监听器）
+            // 如果之前已经在CharacterLoader中初始化过，这里会再次调用，但事件监听器可以重复注册
+            // 为了避免重复初始化，我们可以检查是否已经注册过监听器
+            // 或者简单地再次调用，因为事件系统允许重复监听器
+            try {
+                character.passiveSkills.initializeEvents.call(character.passiveSkills, character);
+            } catch (error) {
+                console.error(`初始化 ${character.name} 的事件监听器时出错:`, error);
+            }
+        }
     }
 
     getAllies() {
@@ -306,6 +321,7 @@ class GameState {
     // 统一的状态效果处理方法（事件化版本）
     processStatusEffects(character, triggerTime) {
         const effectsToRemove = [];
+        const effectsToTrigger = []; // 需要触发的特殊效果
 
         // 触发状态效果处理开始事件
         character.trigger('status_effects_processing_start', {
@@ -463,14 +479,6 @@ class GameState {
             newCharacter.hasExtraAction = true;
             newCharacter.extraActionCount--;
             this.addLog(`${newCharacter.name} 获得额外行动机会（剩余 ${newCharacter.extraActionCount} 次）`, 'buff');
-        }
-        
-        // 处理逾柿的亡语效果（每回合开始时）
-        const deadYushi = this.characters.find(c => c.name === "逾柿" && c.deathRattleActive);
-        if (deadYushi && deadYushi.passiveSkills && deadYushi.passiveSkills.deathRattle) {
-            if (deadYushi.passiveSkills.deathRattle.onTurnStart) {
-                deadYushi.passiveSkills.deathRattle.onTurnStart(deadYushi, this.characters, this);
-            }
         }
     }
     
