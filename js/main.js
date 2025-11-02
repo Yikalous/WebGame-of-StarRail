@@ -3,6 +3,11 @@ document.addEventListener('DOMContentLoaded', function () {
     console.log('游戏初始化开始...');
 
     try {
+        // 初始化事件系统（确保在其他系统之前）
+        if (!window.eventSystem) {
+            window.eventSystem = new EventSystem();
+        }
+        
         // 基础系统初始化
         const gameState = new GameState();
         const skillExecutor = new SkillExecutor();

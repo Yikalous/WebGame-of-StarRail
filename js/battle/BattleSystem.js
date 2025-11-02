@@ -20,7 +20,32 @@ class BattleSystem {
         }
 
         const allCharacters = this.gameState.characters;
-        return this.skillExecutor.execute(skill, user, target, allCharacters);
+
+        // 触发技能执行前事件
+        const beforeExecuteResult = user.trigger('before_skill_execute', {
+            skill: skill,
+            user: user,
+            target: target,
+            allCharacters: allCharacters
+        });
+
+        // 如果技能执行被取消，直接返回
+        if (beforeExecuteResult.cancelled) {
+            user.Log(`技能执行被取消: ${beforeExecuteResult.cancelledBy}`, 'debuff');
+            return true;
+        }
+
+        const result = this.skillExecutor.execute(skill, user, target, allCharacters);
+
+        // 触发技能执行后事件
+        user.trigger('after_skill_execute', {
+            skill: skill,
+            user: user,
+            target: target,
+            result: result
+        });
+
+        return result;
     }
 
     autoSelectTarget(skill, user) {
